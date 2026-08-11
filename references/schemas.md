@@ -111,6 +111,65 @@ lexicographic tie-breaking.
 If a configured pair or witness-depth bound prevents a decision, exit `3`
 reports unknown. It never reports equivalent after truncation.
 
+## `kerf.factor.v1`
+
+Used by `factor` to check a supplied context-relative boundary map.
+
+```json
+{
+  "schema_version": "kerf.factor.v1",
+  "machine": {"initial": "...", "actions": [], "states": []},
+  "context": {"initial": "...", "states": []},
+  "factor_map": [
+    {
+      "machine_state": "m0",
+      "context_state": "c0",
+      "boundary_state": "z0"
+    }
+  ],
+  "limits": {"max_product_states": 1000000}
+}
+```
+
+The map domain must be exactly the reachable `(machine_state, context_state)`
+product. Duplicate, missing, unreachable, unknown, and empty entries are
+invalid. Without a context, `context_state` is `null`. The only operation-
+specific bound is positive `max_product_states`; reaching it before exploration
+closes returns unknown.
+
+For each fibre of the supplied map `q`, the checker requires:
+
+- one protected observation;
+- for an action enabled at two fibre members, one emitted value; and
+- for that jointly enabled action, one successor `q` state.
+
+Different fibre members may have different enabled-action domains because the
+context monitor is retained externally. A lawful result emits a canonical
+`kerf.factor-representation.v1`: the initial boundary state, observation per
+state, and a constrained transition for each action enabled anywhere in the
+fibre. An action enabled nowhere in the reachable fibre is explicitly
+`unconstrained`; this means the supplied context provides no reachable evidence
+for that coordinate, not that an implementation may ignore the context.
+
+An unlawful map is a completed analysis (`status: "ok"`, `lawful: false`), not
+invalid input. Its witness names the broken law and a deterministic pair of
+shortest access words ordered left then right, plus the offending action for emission or successor
+conflicts. Witnesses minimize maximum exposure length, then each access word's
+length and lexical order, followed by action, law kind, and boundary ID.
+
+`context_retained: true` is an operation-mode marker. It also applies when the
+input omits `context`, because that case uses the synthesized all-actions unit
+context.
+
+Exact claim: the reachable finite product behavior does or does not factor
+through `(q, id_context)` using the emitted boundary representation and the
+supplied output-blind context monitor, relative to the declared protected
+observations and emissions.
+
+Nonclaims: minimum boundary cardinality; validity under larger contexts;
+source-program equivalence; liveness; fairness; timing; causality; or any
+unmodeled effect.
+
 ## `kerf.candidates.v1`
 
 Used by `validate-candidates` and `pareto`.

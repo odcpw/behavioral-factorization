@@ -134,13 +134,16 @@ This is an experiment, not a theorem of software.
 ## Architecture nucleus
 
 Enumerate near-optimal but semantically wrong candidates. Each invariant, type
-distinction, or discriminating test rejects a subset. A minimum hitting set of
-evidence that rejects every wrong candidate is a useful **architecture nucleus**:
-the smallest strong structure that must be fixed before weaker reversible
-migration can proceed [C].
+distinction, or discriminating test rejects a subset. An inclusion-minimal
+hitting set of evidence that rejects every wrong candidate is a useful
+**architecture nucleus**: no member can be removed without admitting a known
+wrong candidate [C].
 
-Validate minimality: remove each nucleus member and demonstrate at least one
-wrong candidate that becomes admissible.
+Validate inclusion-minimality by removing each nucleus member and demonstrating
+at least one wrong candidate that becomes admissible. This does not prove
+minimum cardinality: a different hitting set may use fewer members. Claim the
+smallest nucleus only after exhaustive search on a bounded instance or a checked
+solver certificate that no smaller hitting set exists.
 
 ## Migration graph
 

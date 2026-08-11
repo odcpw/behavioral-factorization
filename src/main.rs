@@ -1,5 +1,6 @@
 use kerf::TOOL_VERSION;
 use kerf::candidates::{self, CandidateInput};
+use kerf::factor::{self, FactorInput, FactorLimits};
 use kerf::lts::{self, CompareInput, Limits, LtsInput};
 use kerf::report::{ToolError, sha256_hex};
 use kerf::transport::{self, TransportInput};
@@ -13,6 +14,13 @@ use std::path::Path;
 
 const RESULT_SCHEMA: &str = "kerf.result.v1";
 
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(untagged)]
+enum AppliedLimits {
+    Lts(Limits),
+    Factor(FactorLimits),
+}
+
 #[derive(Serialize)]
 struct ResultEnvelope<T> {
     schema_version: &'static str,
@@ -20,7 +28,7 @@ struct ResultEnvelope<T> {
     operation: String,
     input_sha256: String,
     status: &'static str,
-    limits: Option<Limits>,
+    limits: Option<AppliedLimits>,
     result: T,
 }
 
@@ -29,7 +37,7 @@ struct ExecutionError {
     error: ToolError,
     operation: Option<String>,
     input_sha256: Option<String>,
-    limits: Option<Limits>,
+    limits: Option<AppliedLimits>,
 }
 
 #[derive(Serialize)]
@@ -42,7 +50,7 @@ struct ErrorEnvelope<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     input_sha256: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    limits: Option<Limits>,
+    limits: Option<AppliedLimits>,
     error: &'a ToolError,
 }
 
@@ -100,7 +108,7 @@ fn run() -> Result<(), ExecutionError> {
             dispatch(command, Path::new(path))
         }
         _ => Err(bare_error(ToolError::invalid(
-            "usage: kerf <validate-lts|quotient|distinguish|validate-candidates|pareto|score-routes> <input.json>",
+            "usage: kerf <validate-lts|quotient|distinguish|factor|validate-candidates|pareto|score-routes> <input.json>",
         ))),
     }
 }
@@ -111,6 +119,7 @@ fn is_command(command: &str) -> bool {
         "validate-lts"
             | "quotient"
             | "distinguish"
+            | "factor"
             | "validate-candidates"
             | "pareto"
             | "score-routes"
@@ -129,7 +138,7 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
         "validate-lts" => {
             let input: LtsInput =
                 parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
-            let limits = Some(input.limits);
+            let limits = Some(AppliedLimits::Lts(input.limits));
             let result = lts::validate(&input)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))?;
             emit(command, input_sha256.clone(), limits, result)
@@ -138,7 +147,7 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
         "quotient" => {
             let input: LtsInput =
                 parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
-            let limits = Some(input.limits);
+            let limits = Some(AppliedLimits::Lts(input.limits));
             let result = lts::quotient(&input)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))?;
             emit(command, input_sha256.clone(), limits, result)
@@ -147,8 +156,17 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
         "distinguish" => {
             let input: CompareInput =
                 parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
-            let limits = Some(input.limits);
+            let limits = Some(AppliedLimits::Lts(input.limits));
             let result = lts::compare(&input)
+                .map_err(|error| contextual(error, command, &input_sha256, limits))?;
+            emit(command, input_sha256.clone(), limits, result)
+                .map_err(|error| contextual(error, command, &input_sha256, limits))
+        }
+        "factor" => {
+            let input: FactorInput =
+                parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
+            let limits = Some(AppliedLimits::Factor(input.limits));
+            let result = factor::check(&input)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))?;
             emit(command, input_sha256.clone(), limits, result)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))
@@ -194,7 +212,7 @@ fn contextual(
     error: ToolError,
     operation: &str,
     input_sha256: &str,
-    limits: Option<Limits>,
+    limits: Option<AppliedLimits>,
 ) -> ExecutionError {
     ExecutionError {
         error,
@@ -212,7 +230,7 @@ fn parse<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ToolError> {
 fn emit<T: Serialize>(
     operation: &str,
     input_sha256: String,
-    limits: Option<Limits>,
+    limits: Option<AppliedLimits>,
     result: T,
 ) -> Result<(), ToolError> {
     let envelope = ResultEnvelope {
@@ -241,6 +259,7 @@ COMMANDS:\n\
   validate-lts          Validate a kerf.lts.v1 model\n\
   quotient              Compute its reachable observational quotient\n\
   distinguish           Compare two kerf.compare.v1 machines and emit a shortest witness\n\
+  factor                Check a supplied context-relative boundary-state map\n\
   validate-candidates   Check explicit assignment and authority constraints\n\
   pareto                Compute the exact frontier of the supplied candidate set\n\
   score-routes          Account exact load on supplied static routes\n\n\

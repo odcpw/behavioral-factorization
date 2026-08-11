@@ -141,47 +141,73 @@ pub struct Mismatch {
 }
 
 #[derive(Debug)]
-struct IndexedMachine {
-    actions: Vec<String>,
-    initial: usize,
-    states: Vec<IndexedState>,
+pub(crate) struct IndexedMachine {
+    pub(crate) actions: Vec<String>,
+    pub(crate) initial: usize,
+    pub(crate) states: Vec<IndexedState>,
 }
 
 #[derive(Debug)]
-struct IndexedState {
-    id: String,
-    observation: String,
-    transitions: Vec<IndexedTransition>,
+pub(crate) struct IndexedState {
+    pub(crate) id: String,
+    pub(crate) observation: String,
+    pub(crate) transitions: Vec<IndexedTransition>,
 }
 
 #[derive(Debug)]
-struct IndexedTransition {
-    to: usize,
-    emission: String,
+pub(crate) struct IndexedTransition {
+    pub(crate) to: usize,
+    pub(crate) emission: String,
 }
 
 #[derive(Debug)]
-struct IndexedContext {
-    initial: usize,
-    states: Vec<IndexedContextState>,
+pub(crate) struct IndexedContext {
+    pub(crate) initial: usize,
+    pub(crate) states: Vec<IndexedContextState>,
 }
 
 #[derive(Debug)]
-struct IndexedContextState {
-    id: String,
-    transitions: Vec<Option<usize>>,
+pub(crate) struct IndexedContextState {
+    pub(crate) id: String,
+    pub(crate) transitions: Vec<Option<usize>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct ProductState {
-    machine: usize,
-    context: usize,
+pub(crate) struct ProductState {
+    pub(crate) machine: usize,
+    pub(crate) context: usize,
 }
 
 #[derive(Debug)]
-struct ProductGraph {
-    nodes: Vec<ProductState>,
-    transitions: Vec<Vec<Option<(usize, String)>>>,
+pub(crate) struct ProductGraph {
+    pub(crate) nodes: Vec<ProductState>,
+    pub(crate) transitions: Vec<Vec<Option<(usize, String)>>>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ProductAccess {
+    parents: Vec<Option<(usize, usize)>>,
+    depths: Vec<usize>,
+}
+
+impl ProductAccess {
+    pub(crate) fn access_word(&self, node_index: usize, actions: &[String]) -> Vec<String> {
+        let mut action_indexes = Vec::new();
+        let mut cursor = node_index;
+        while let Some((parent, action)) = self.parents[cursor] {
+            action_indexes.push(action);
+            cursor = parent;
+        }
+        action_indexes.reverse();
+        action_indexes
+            .into_iter()
+            .map(|action| actions[action].clone())
+            .collect()
+    }
+
+    pub(crate) fn depth(&self, node_index: usize) -> usize {
+        self.depths[node_index]
+    }
 }
 
 #[derive(Debug)]
@@ -437,7 +463,7 @@ pub fn compare(input: &CompareInput) -> Result<ComparisonResult, ToolError> {
     })
 }
 
-fn require_schema(actual: &str, expected: &str) -> Result<(), ToolError> {
+pub(crate) fn require_schema(actual: &str, expected: &str) -> Result<(), ToolError> {
     if actual == expected {
         Ok(())
     } else {
@@ -456,7 +482,7 @@ fn validate_limits(limits: Limits) -> Result<(), ToolError> {
     Ok(())
 }
 
-fn index_machine(machine: &Machine) -> Result<IndexedMachine, ToolError> {
+pub(crate) fn index_machine(machine: &Machine) -> Result<IndexedMachine, ToolError> {
     if machine.actions.is_empty() {
         return Err(ToolError::invalid("machine.actions must not be empty"));
     }
@@ -529,7 +555,7 @@ fn index_machine(machine: &Machine) -> Result<IndexedMachine, ToolError> {
     })
 }
 
-fn index_context(
+pub(crate) fn index_context(
     context: Option<&ContextMonitor>,
     actions: &[String],
 ) -> Result<IndexedContext, ToolError> {
@@ -597,11 +623,32 @@ fn index_context(
     Ok(IndexedContext { initial, states })
 }
 
-fn build_product(
+pub(crate) fn build_product(
     machine: &IndexedMachine,
     context: &IndexedContext,
     max_product_states: usize,
 ) -> Result<ProductGraph, ToolError> {
+    build_product_internal(machine, context, max_product_states, false).map(|(graph, _)| graph)
+}
+
+pub(crate) fn build_product_with_access(
+    machine: &IndexedMachine,
+    context: &IndexedContext,
+    max_product_states: usize,
+) -> Result<(ProductGraph, ProductAccess), ToolError> {
+    let (graph, access) = build_product_internal(machine, context, max_product_states, true)?;
+    let access = access.ok_or_else(|| {
+        ToolError::internal("product exploration did not retain requested access paths")
+    })?;
+    Ok((graph, access))
+}
+
+fn build_product_internal(
+    machine: &IndexedMachine,
+    context: &IndexedContext,
+    max_product_states: usize,
+    retain_access: bool,
+) -> Result<(ProductGraph, Option<ProductAccess>), ToolError> {
     let start = ProductState {
         machine: machine.initial,
         context: context.initial,
@@ -610,6 +657,8 @@ fn build_product(
     let mut indexes = BTreeMap::from([(start, 0_usize)]);
     let mut queue = VecDeque::from([0_usize]);
     let mut transitions = Vec::<Vec<Option<(usize, String)>>>::new();
+    let mut parents = retain_access.then(|| vec![None]);
+    let mut depths = retain_access.then(|| vec![0]);
 
     while let Some(node_index) = queue.pop_front() {
         let node = nodes[node_index];
@@ -636,6 +685,12 @@ fn build_product(
                 let index = nodes.len();
                 nodes.push(successor);
                 indexes.insert(successor, index);
+                if let Some(parents) = &mut parents {
+                    parents.push(Some((node_index, action_index)));
+                }
+                if let Some(depths) = &mut depths {
+                    depths.push(depths[node_index] + 1);
+                }
                 queue.push_back(index);
                 index
             };
@@ -644,7 +699,10 @@ fn build_product(
         transitions.push(row);
     }
 
-    Ok(ProductGraph { nodes, transitions })
+    let access = parents
+        .zip(depths)
+        .map(|(parents, depths)| ProductAccess { parents, depths });
+    Ok((ProductGraph { nodes, transitions }, access))
 }
 
 fn comparison_failure(

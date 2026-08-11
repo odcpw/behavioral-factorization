@@ -13,6 +13,7 @@ models. LTS exploration has explicit state, pair, and witness-depth limits:
 - validate a total transition system and finite context monitor;
 - compute the reachable observational quotient;
 - compare two machines and return a shortest distinguishing action word;
+- check whether a supplied context-relative map is a lawful behavioral factor;
 - validate explicit assignment, separation, pin, and authority constraints;
 - compute the exact Pareto frontier of the represented-feasible supplied set; and
 - account checked rational load on declared static routes.
@@ -34,6 +35,7 @@ contextual state, protocol, and routed cost—not a universal scalar.
 cargo test --all-targets --locked
 cargo run --quiet -- quotient examples/toggle.lts.json | jq
 cargo run --quiet -- distinguish examples/rng-order.compare.json | jq
+cargo run --quiet -- factor examples/context-side-information.factor.json | jq
 cargo run --quiet -- pareto examples/architecture.candidates.json | jq
 cargo run --quiet -- score-routes examples/memory.transport.json | jq
 ```

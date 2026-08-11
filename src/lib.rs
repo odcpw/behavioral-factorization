@@ -1,4 +1,5 @@
 pub mod candidates;
+pub mod factor;
 pub mod lts;
 pub mod report;
 pub mod transport;

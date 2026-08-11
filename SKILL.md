@@ -125,6 +125,7 @@ For finite deterministic models use `kerf`:
 ```bash
 kerf quotient model.lts.json
 kerf distinguish pair.compare.json
+kerf factor proposed.factor.json
 ```
 
 These commands certify only the supplied finite models. A resource limit
@@ -148,6 +149,13 @@ contexts. Ask:
 Mori-Zwanzig supplies the warning: eliminating relevant state generally
 reappears as memory and unresolved forcing. A small stateless API with large
 coordination machinery is evidence against the seam.
+
+When a finite proposed map `q` is already explicit, `kerf factor` checks that
+observations and every jointly enabled action's emission and successor
+boundary state factor through `q`. The context monitor remains external side
+information and may select different enabled-action domains. Passing proves
+only that `(q, id_context)` factors that supplied reachable finite product; it
+does not infer or minimize `q`.
 
 ### 5. Separate irreducible flow from demonstrated waste
 
