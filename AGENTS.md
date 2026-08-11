@@ -7,10 +7,11 @@ This file adds only repository-specific rules to
 
 - `/home/oliver/Projects/odcpw/behavioral-factorization` is the canonical
   local checkout. Git identity is `odcpw <odcpw@users.noreply.github.com>` and
-  the branch is `main`.
-- This is an unpublished research tool and Codex skill. There is no remote or
-  release authority yet; do not create or publish either without Oliver's
-  instruction.
+  the branch is `main`. The private canonical remote is
+  `git@github-odcpw:odcpw/behavioral-factorization.git`.
+- This is a private research tool and Codex skill. There is no public release
+  authority or release license; do not make it public or publish a release
+  without Oliver's instruction.
 - The repository is independently worded from public literature and contains
   no remc2 source, owner data, private traces, or MagicCarpet implementation
   details.

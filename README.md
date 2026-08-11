@@ -53,6 +53,6 @@ require it.
 
 ## Status
 
-This is a local unpublished `odcpw` repository with no remote and no release
-license yet. The repository contains no MagicCarpet source, remc2 material,
-owner data, or private traces.
+This is a private `odcpw` repository with no public release authority or
+release license. The repository contains no MagicCarpet source, remc2
+material, owner data, or private traces.
