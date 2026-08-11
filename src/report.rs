@@ -1,6 +1,9 @@
 use serde::Serialize;
+use serde::de::{Deserialize, Deserializer, Error as _, MapAccess, Visitor};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ToolError {
@@ -49,6 +52,44 @@ impl Display for ToolError {
 }
 
 impl std::error::Error for ToolError {}
+
+pub(crate) fn deserialize_string_map_no_duplicates<'de, D, V>(
+    deserializer: D,
+) -> Result<BTreeMap<String, V>, D::Error>
+where
+    D: Deserializer<'de>,
+    V: Deserialize<'de>,
+{
+    struct StringMapVisitor<V>(PhantomData<fn() -> V>);
+
+    impl<'de, V> Visitor<'de> for StringMapVisitor<V>
+    where
+        V: Deserialize<'de>,
+    {
+        type Value = BTreeMap<String, V>;
+
+        fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("a JSON object with unique member names")
+        }
+
+        fn visit_map<A>(self, mut access: A) -> Result<Self::Value, A::Error>
+        where
+            A: MapAccess<'de>,
+        {
+            let mut values = BTreeMap::new();
+            while let Some((key, value)) = access.next_entry::<String, V>()? {
+                if values.insert(key.clone(), value).is_some() {
+                    return Err(A::Error::custom(format!(
+                        "duplicate JSON object member {key:?}"
+                    )));
+                }
+            }
+            Ok(values)
+        }
+    }
+
+    deserializer.deserialize_map(StringMapVisitor(PhantomData))
+}
 
 #[must_use]
 pub fn sha256_hex(bytes: &[u8]) -> String {

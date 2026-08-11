@@ -32,6 +32,10 @@ observations and emissions are opaque UTF-8 strings. Rates and costs use exact
 unsigned integer or rational strings; no binary floating point or tolerance is
 part of v0.1.
 
+LTS, factor, and recomposition semantic maps reject duplicate object member
+names. A parser that silently keeps the first or last duplicate could otherwise
+make textual declaration order change a verdict.
+
 ## `kerf.lts.v1`
 
 Used by `validate-lts` and `quotient`.
@@ -145,11 +149,15 @@ For each fibre of the supplied map `q`, the checker requires:
 
 Different fibre members may have different enabled-action domains because the
 context monitor is retained externally. A lawful result emits a canonical
-`kerf.factor-representation.v1`: the initial boundary state, observation per
-state, and a constrained transition for each action enabled anywhere in the
-fibre. An action enabled nowhere in the reachable fibre is explicitly
-`unconstrained`; this means the supplied context provides no reachable evidence
-for that coordinate, not that an implementation may ignore the context.
+`kerf.factor-representation.v2`: the certified context monitor, initial
+boundary state, observation per state, and a constrained transition for each
+action enabled anywhere in the fibre. The context is canonicalized by state ID;
+`null` denotes the all-actions unit monitor. An action enabled nowhere in the
+reachable fibre is explicitly `unconstrained`; this means the supplied context
+provides no reachable evidence for that coordinate, not that an implementation
+may ignore the context. Detached v1 representations are rejected by
+`recompose`: they lack the monitor needed to prevent a widened context from
+combining stepwise constraints that never belonged to one certified run.
 
 An unlawful map is a completed analysis (`status: "ok"`, `lawful: false`), not
 invalid input. Its witness names the broken law and a deterministic pair of
@@ -169,6 +177,88 @@ observations and emissions.
 Nonclaims: minimum boundary cardinality; validity under larger contexts;
 source-program equivalence; liveness; fairness; timing; causality; or any
 unmodeled effect.
+
+## `kerf.recompose.v1`
+
+Used by `recompose` to check the inverse supplied finite direction.
+
+```json
+{
+  "schema_version": "kerf.recompose.v1",
+  "factors": [
+    {
+      "id": "boundary",
+      "representation": {
+        "schema_version": "kerf.factor-representation.v2",
+        "certified_context": null,
+        "initial": "z0",
+        "actions": ["tick"],
+        "states": []
+      }
+    }
+  ],
+  "observation_readout": [
+    {"inputs": {"boundary": "ready"}, "output": "ready"}
+  ],
+  "emission_readouts": {
+    "tick": [
+      {"inputs": {"boundary": "done"}, "output": "done"}
+    ]
+  },
+  "reference": {"initial": "r0", "actions": ["tick"], "states": []},
+  "context": null,
+  "limits": {
+    "max_product_states": 1000000,
+    "max_pairs": 1000000,
+    "max_witness_length": 100000
+  }
+}
+```
+
+Factor IDs are unique and canonicalized. Every factor and the total reference
+must declare the same external action set. Readout inputs name exactly every
+factor ID and contain factor observations or action-specific emissions, never
+hidden factor-state IDs. Duplicate signatures are invalid. Extra unreachable
+cases receive no claim; every tuple reached through proved transitions must
+have exactly one applicable table entry.
+
+The first pass synchronizes the proposed context and every factor's certified
+context, then explores only the reachable product. A proposed-context action is
+proved only when every certified monitor enables it and every factor coordinate
+is constrained. Otherwise the edge is a hole with the shortest canonical word,
+including the offending action. The checker never follows, defaults, or applies
+an emission readout to a hole. The product-state bound covers factor states,
+their certified monitor states, and the proposed context state.
+
+The second pass compares the proved region with the reference using the same
+shortest observation/emission witness convention as `distinguish`:
+
+- `equivalent`: the bounded reachable product is complete and equivalent;
+- `unproved`: no mismatch was found, but a reachable hole exists; or
+- `inequivalent`: a fully proved word mismatches the reference.
+
+Inequivalence is completion-monotone, so an earlier hole never hides a known
+mismatch. In that case both `witness` and `unproved` are returned.
+An exposed hole is retained even when its word is longer than the configured
+witness-search depth. `witness_minimality: "completion_robust"` means product
+exploration completed and no earlier canonical hole can hide an earlier
+mismatch. `"proved_region_only"` means the reported mismatch is still definite
+and shortest in the explored proved region, but an earlier hole or an unexamined
+product frontier could contain an earlier mismatch. Pair, product, or
+witness-depth exhaustion is unknown (exit `3`), not `unproved`, unless an
+observation or emission mismatch is already fully exposed without crossing the
+exhausted frontier. Such a definite inequivalence is returned first.
+`explored_composed_states` counts the states admitted under the product bound;
+it is not a total reachable-state count on an early inequivalence result.
+
+Exact claim: finite-prefix equivalence or inequivalence of the supplied factor
+representations and explicit readouts against the supplied reference, over the
+proved reachable language admitted by all supplied monitors.
+
+Nonclaims: provenance or lawfulness of fabricated factor representations;
+factor or readout inference; source-program equivalence; typed ports; hidden
+actions; feedback; delay; hierarchy; asynchrony; liveness; timing; causality;
+or unmodeled effects.
 
 ## `kerf.candidates.v1`
 

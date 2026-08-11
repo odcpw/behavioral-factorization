@@ -8,7 +8,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const FACTOR_SCHEMA: &str = "kerf.factor.v1";
-const REPRESENTATION_SCHEMA: &str = "kerf.factor-representation.v1";
+pub const REPRESENTATION_SCHEMA: &str = "kerf.factor-representation.v2";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -57,23 +57,44 @@ pub struct FactorResult {
     pub nonclaims: Vec<&'static str>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct BoundaryRepresentation {
-    pub schema_version: &'static str,
+    pub schema_version: String,
+    pub certified_context: CertifiedContext,
     pub initial: String,
     pub actions: Vec<String>,
     pub states: Vec<BoundaryState>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum CertifiedContext {
+    Monitor(ContextMonitor),
+    AllActions(()),
+}
+
+impl CertifiedContext {
+    #[must_use]
+    pub fn as_monitor(&self) -> Option<&ContextMonitor> {
+        match self {
+            Self::Monitor(context) => Some(context),
+            Self::AllActions(()) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct BoundaryState {
     pub id: String,
     pub observation: String,
+    #[serde(deserialize_with = "crate::report::deserialize_string_map_no_duplicates")]
     pub transitions: BTreeMap<String, BoundaryTransition>,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum BoundaryTransition {
     Constrained { to: String, emission: String },
     Unconstrained,
@@ -184,7 +205,13 @@ pub fn check(input: &FactorInput) -> Result<FactorResult, ToolError> {
         });
     }
 
-    let representation = build_representation(&machine, &graph, &boundary_by_node, &groups);
+    let representation = build_representation(
+        &machine,
+        input.context.as_ref(),
+        &graph,
+        &boundary_by_node,
+        &groups,
+    );
     Ok(FactorResult {
         algorithm: "context_retained_factor_map_v1",
         lawful: true,
@@ -485,6 +512,7 @@ fn witness_from_conflict(
 
 fn build_representation(
     machine: &crate::lts::IndexedMachine,
+    certified_context: Option<&ContextMonitor>,
     graph: &ProductGraph,
     boundary_by_node: &[String],
     groups: &BTreeMap<String, Vec<usize>>,
@@ -522,11 +550,24 @@ fn build_representation(
         })
         .collect();
     BoundaryRepresentation {
-        schema_version: REPRESENTATION_SCHEMA,
+        schema_version: REPRESENTATION_SCHEMA.to_owned(),
+        certified_context: canonical_context(certified_context)
+            .map_or(CertifiedContext::AllActions(()), CertifiedContext::Monitor),
         initial: boundary_by_node[0].clone(),
         actions: machine.actions.clone(),
         states,
     }
+}
+
+fn canonical_context(context: Option<&ContextMonitor>) -> Option<ContextMonitor> {
+    context.map(|context| {
+        let mut states = context.states.clone();
+        states.sort_by(|left, right| left.id.cmp(&right.id));
+        ContextMonitor {
+            initial: context.initial.clone(),
+            states,
+        }
+    })
 }
 
 fn factor_nonclaims() -> Vec<&'static str> {

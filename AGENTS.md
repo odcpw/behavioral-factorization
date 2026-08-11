@@ -39,6 +39,8 @@ This file adds only repository-specific rules to
   equivalence witnesses, and observational quotienting.
 - `src/factor.rs` checks supplied context-relative factor maps and emits their
   induced partial boundary representations or shortest conflict witnesses.
+- `src/recompose.rs` synchronizes certified factor contexts, constructs only
+  the proved-reachable synchronous product, and compares it with a reference.
 - `src/candidates.rs` owns explicit architecture assignments, executable hard
   constraints, exact metric validation, and Pareto dominance.
 - `src/transport.rs` owns arbitrary-precision exact rational arithmetic for

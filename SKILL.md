@@ -126,6 +126,7 @@ For finite deterministic models use `kerf`:
 kerf quotient model.lts.json
 kerf distinguish pair.compare.json
 kerf factor proposed.factor.json
+kerf recompose proposed.recompose.json
 ```
 
 These commands certify only the supplied finite models. A resource limit
@@ -156,6 +157,18 @@ boundary state factor through `q`. The context monitor remains external side
 information and may select different enabled-action domains. Passing proves
 only that `(q, id_context)` factors that supplied reachable finite product; it
 does not infer or minimize `q`.
+
+`kerf recompose` checks the inverse supplied finite direction. Each factor
+representation carries the context language under which its coordinates were
+certified. The checker synchronizes those monitors with the proposed context,
+uses only constrained in-language transitions, applies explicit observation
+and emission readouts, and compares the proved-reachable product with a total
+reference. Leaving a certified language or reaching an unconstrained
+coordinate is `unproved`, never an implicit completion. A definite mismatch
+remains an inequivalence even if another word is unproved; the result reports
+both and states whether witness minimality is completion-robust or only within
+the proved region. This checks supplied representations, not their producer
+provenance; locally checkable proof bundles are a separate layer.
 
 ### 5. Separate irreducible flow from demonstrated waste
 

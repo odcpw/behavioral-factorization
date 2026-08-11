@@ -42,6 +42,7 @@ pub struct Machine {
 pub struct State {
     pub id: String,
     pub observation: String,
+    #[serde(deserialize_with = "crate::report::deserialize_string_map_no_duplicates")]
     pub transitions: BTreeMap<String, Transition>,
 }
 
@@ -52,17 +53,18 @@ pub struct Transition {
     pub emission: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ContextMonitor {
     pub initial: String,
     pub states: Vec<ContextState>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ContextState {
     pub id: String,
+    #[serde(deserialize_with = "crate::report::deserialize_string_map_no_duplicates")]
     pub transitions: BTreeMap<String, String>,
 }
 

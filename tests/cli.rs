@@ -60,6 +60,89 @@ fn factor_example_retains_context_side_information() {
         output["result"]["representation"]["states"][0]["transitions"]["c"]["status"],
         "unconstrained"
     );
+    assert_eq!(
+        output["result"]["representation"]["schema_version"],
+        "kerf.factor-representation.v2"
+    );
+    assert_eq!(
+        output["result"]["representation"]["certified_context"]["initial"],
+        "branch"
+    );
+}
+
+#[test]
+fn one_factor_recomposition_is_exact_under_its_certified_context() {
+    let output = run(
+        "recompose",
+        "examples/context-side-information.recompose.json",
+    );
+    assert_eq!(output["operation"], "recompose");
+    assert_eq!(output["result"]["verdict"], "equivalent");
+    assert_eq!(output["result"]["explored_composed_states"], 3);
+    assert_eq!(output["limits"]["max_pairs"], 16);
+}
+
+#[test]
+fn widened_recomposition_is_successfully_unproved() {
+    let mut input: Value = serde_json::from_slice(
+        &std::fs::read(repo_path(
+            "examples/context-side-information.recompose.json",
+        ))
+        .expect("example must read"),
+    )
+    .expect("example must be JSON");
+    input["context"] = Value::Null;
+    let path = std::env::temp_dir().join(format!(
+        "kerf-recompose-unproved-{}.json",
+        std::process::id()
+    ));
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&input).expect("input must serialize"),
+    )
+    .expect("temporary input must write");
+    let output = Command::new(env!("CARGO_BIN_EXE_kerf"))
+        .arg("recompose")
+        .arg(&path)
+        .output()
+        .expect("kerf must run");
+    std::fs::remove_file(&path).expect("temporary input must be removable");
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("stdout must be JSON");
+    assert_eq!(result["result"]["verdict"], "unproved");
+    assert_eq!(
+        result["result"]["unproved"]["word"],
+        serde_json::json!(["c"])
+    );
+}
+
+#[test]
+fn recomposition_product_limit_is_unknown() {
+    let mut input: Value = serde_json::from_slice(
+        &std::fs::read(repo_path("examples/two-factor.recompose.json")).expect("example must read"),
+    )
+    .expect("example must be JSON");
+    input["limits"]["max_product_states"] = serde_json::json!(1);
+    let path =
+        std::env::temp_dir().join(format!("kerf-recompose-limit-{}.json", std::process::id()));
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&input).expect("input must serialize"),
+    )
+    .expect("temporary input must write");
+    let output = Command::new(env!("CARGO_BIN_EXE_kerf"))
+        .arg("recompose")
+        .arg(&path)
+        .output()
+        .expect("kerf must run");
+    std::fs::remove_file(&path).expect("temporary input must be removable");
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).expect("stderr must be JSON");
+    assert_eq!(error["status"], "unknown");
+    assert_eq!(error["operation"], "recompose");
+    assert_eq!(error["limits"]["max_product_states"], 1);
 }
 
 #[test]
