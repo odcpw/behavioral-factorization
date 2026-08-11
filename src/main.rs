@@ -1,5 +1,6 @@
 use kerf::TOOL_VERSION;
 use kerf::candidates::{self, CandidateInput};
+use kerf::cert::{self, CertificateInput};
 use kerf::factor::{self, FactorInput, FactorLimits};
 use kerf::lts::{self, CompareInput, Limits, LtsInput};
 use kerf::recompose::{self, RecomposeInput};
@@ -109,7 +110,7 @@ fn run() -> Result<(), ExecutionError> {
             dispatch(command, Path::new(path))
         }
         _ => Err(bare_error(ToolError::invalid(
-            "usage: kerf <validate-lts|quotient|distinguish|factor|recompose|validate-candidates|pareto|score-routes> <input.json>",
+            "usage: kerf <validate-lts|quotient|distinguish|factor|recompose|verify-certificate|validate-candidates|pareto|score-routes> <input.json>",
         ))),
     }
 }
@@ -122,6 +123,7 @@ fn is_command(command: &str) -> bool {
             | "distinguish"
             | "factor"
             | "recompose"
+            | "verify-certificate"
             | "validate-candidates"
             | "pareto"
             | "score-routes"
@@ -181,6 +183,14 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
                 .map_err(|error| contextual(error, command, &input_sha256, limits))?;
             emit(command, input_sha256.clone(), limits, result)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))
+        }
+        "verify-certificate" => {
+            let input: CertificateInput =
+                parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
+            let result = cert::verify(&input)
+                .map_err(|error| contextual(error, command, &input_sha256, None))?;
+            emit(command, input_sha256.clone(), None, result)
+                .map_err(|error| contextual(error, command, &input_sha256, None))
         }
         "validate-candidates" => {
             let input: CandidateInput =
@@ -254,10 +264,18 @@ fn emit<T: Serialize>(
         result,
     };
     let mut stdout = io::stdout().lock();
-    serde_json::to_writer(&mut stdout, &envelope)
-        .map_err(|error| ToolError::internal(format!("could not serialize result: {error}")))?;
+    serde_json::to_writer(&mut stdout, &envelope).map_err(|error| {
+        if error.is_io() {
+            ToolError::io(format!("could not write result: {error}"))
+        } else {
+            ToolError::internal(format!("could not serialize result: {error}"))
+        }
+    })?;
     writeln!(&mut stdout)
         .map_err(|error| ToolError::io(format!("could not write result: {error}")))?;
+    stdout
+        .flush()
+        .map_err(|error| ToolError::io(format!("could not flush result: {error}")))?;
     Ok(())
 }
 
@@ -272,6 +290,7 @@ COMMANDS:\n\
   distinguish           Compare two kerf.compare.v1 machines and emit a shortest witness\n\
   factor                Check a supplied context-relative boundary-state map\n\
   recompose             Check exact reachable synchronous recomposition\n\
+  verify-certificate    Locally verify a finite relation, witness, or trace\n\
   validate-candidates   Check explicit assignment and authority constraints\n\
   pareto                Compute the exact frontier of the supplied candidate set\n\
   score-routes          Account exact load on supplied static routes\n\n\

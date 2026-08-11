@@ -140,6 +140,12 @@ For the repository's fixed executable regression falsifier, run
 Git HEAD and executable hash. It does not prove source-to-binary derivation or
 generalize beyond the corpus; see [schemas.md](references/schemas.md).
 
+When another tool supplies a finite relation, distinguishing word, or recorded
+trace, use `kerf verify-certificate` to check that proof object locally against
+its hash-bound subject. Semantic acceptance is independent of producer
+revision metadata. This is proof checking, not source equivalence, signature
+verification, witness minimization, or certificate synthesis.
+
 ### 4. Factor through explicit ports
 
 A component boundary must expose all and only the state, actions, order,

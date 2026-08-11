@@ -41,6 +41,8 @@ This file adds only repository-specific rules to
   induced partial boundary representations or shortest conflict witnesses.
 - `src/recompose.rs` synchronizes certified factor contexts, constructs only
   the proved-reachable synchronous product, and compares it with a reference.
+- `src/cert.rs` locally checks hash-bound finite relations, inequivalence
+  witnesses, and recorded traces; provenance remains orthogonal to validity.
 - `src/candidates.rs` owns explicit architecture assignments, executable hard
   constraints, exact metric validation, and Pareto dominance.
 - `src/transport.rs` owns arbitrary-precision exact rational arithmetic for

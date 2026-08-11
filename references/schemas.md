@@ -164,6 +164,158 @@ lexicographic tie-breaking.
 If a configured pair or witness-depth bound prevents a decision, exit `3`
 reports unknown. It never reports equivalent after truncation.
 
+## `kerf.certificate-check.v1`
+
+Used by `verify-certificate` to check a supplied finite proof object without
+re-running the algorithm that produced it. The command accepts exactly three
+claim kinds:
+
+```json
+{
+  "schema_version": "kerf.certificate-check.v1",
+  "claim": {
+    "kind": "compare_equivalence_relation",
+    "subject": {
+      "schema_version": "kerf.cert.compare-subject.v1",
+      "left": {
+        "initial": "l0",
+        "actions": ["tick"],
+        "states": [{
+          "id": "l0",
+          "observation": "ready",
+          "transitions": {"tick": {"to": "l0", "emission": "done"}}
+        }]
+      },
+      "right": {
+        "initial": "r0",
+        "actions": ["tick"],
+        "states": [{
+          "id": "r0",
+          "observation": "ready",
+          "transitions": {"tick": {"to": "r0", "emission": "done"}}
+        }]
+      },
+      "context": null
+    },
+    "subject_sha256": "...",
+    "relation": [
+      {"left": "l0", "right": "r0", "context": null}
+    ],
+    "provenance": null
+  },
+  "expected_provenance": null
+}
+```
+
+`compare_equivalence_relation` checks an explicit relation over
+`(left_state, right_state, context_state)`. It rejects duplicate, unknown, or
+unreachable extra tuples; requires the initial tuple; and explores from that
+tuple in sorted action order. At every reached tuple the observations must be
+equal. For every action enabled by the shared context, the transition
+emissions must be equal and the successor tuple must be present. Differences
+behind context-disabled actions make no claim and do not invalidate the
+relation.
+
+Here “equivalence relation” means a cross-machine relation that certifies the
+two initial behaviors are equivalent. It is not claimed to be a reflexive,
+symmetric, and transitive relation on one common state carrier.
+
+`compare_inequivalence_witness` uses the same compare subject and replaces the
+relation with:
+
+```json
+{
+  "word": ["cast", "cast"],
+  "mismatch": {
+    "kind": "transition_emission",
+    "left": "goat",
+    "right": "fireball"
+  }
+}
+```
+
+The other mismatch kind is `state_observation`. Replay starts at the two
+initial states and the initial context. Every action must be known and enabled;
+the claimed mismatch kind and values must occur exactly at the end of the
+word. A mismatch at an earlier prefix rejects a padded witness. Replay proves
+that word distinguishes the supplied machines; it does not prove the word is
+globally shortest.
+
+`lts_trace` uses a `kerf.cert.lts-subject.v1` subject containing one `machine`
+and optional `context`. Its proof object records the initial point and every
+step:
+
+```json
+{
+  "initial": {"state": "locked", "context": null, "observation": "locked"},
+  "steps": [
+    {
+      "action": "toggle",
+      "emission": "changed",
+      "to": {
+        "state": "unlocked",
+        "context": null,
+        "observation": "unlocked"
+      }
+    }
+  ]
+}
+```
+
+The checker replays the supplied model and requires every recorded state,
+context state, observation, emission, and successor to match. This certifies
+only that one finite trace.
+
+### Semantic subject identity
+
+`subject_sha256` is exactly 64 lowercase hexadecimal characters encoding
+SHA-256 over an injective, declaration-order-independent binary encoding, not
+over JSON text. A noncanonical digest is a completed certificate rejection
+with `subject_hash_invalid_format`. Version 1 is encoded as follows:
+
+1. ASCII domain prefix `kerf.cert.subject.v1\0`, followed by `pair\0` for a
+   compare subject or `single\0` for an LTS subject.
+2. Every count and canonical state index is an unsigned 64-bit little-endian
+   integer. Every string is its UTF-8 byte length in that format followed by
+   the exact bytes.
+3. The canonically sorted action vector is encoded once.
+4. A machine encodes its state count, canonical initial-state index, then
+   states sorted by ID. Each state encodes ID, observation, and, in canonical
+   action order, the canonical target-state index and emission.
+5. A context begins with byte `0` when absent. A present context begins with
+   byte `1`, then encodes its state count, canonical initial index, and states
+   sorted by ID. Each state encodes its ID followed by one transition per
+   canonical action: byte `0` when disabled or byte `1` plus the canonical
+   target index when enabled.
+6. A compare subject encodes the left machine and then the right machine. An
+   LTS subject encodes its one machine. The context follows the machine data.
+
+The hash excludes JSON formatting and declaration order, and also excludes the
+proof object, all provenance fields (including producer limits and revision),
+expected provenance, and outer input bytes. Changing a represented state,
+observation, emission, action, successor, initial state, or context therefore
+changes the semantic subject hash.
+
+Subject schema and model validity are checked first. A well-formed certificate
+with a stale subject hash or false local proof returns exit `0` with
+`accepted: false` and a typed rejection. An invalid semantic subject returns
+the ordinary typed input error on stderr with exit `2`.
+
+Optional provenance has `producer`, `operation`, `input_sha256`,
+`tool_version`, optional LTS `limits`, and optional `revision`. Supplying
+`expected_provenance` yields a separate `match` or `mismatch` status and exact
+mismatching field names. Without an expectation, provenance is `absent` or
+`present_unchecked`. Provenance never changes semantic `accepted`.
+
+Exact claims: local closure of the supplied reachable relation; replay of the
+supplied distinguishing word; or replay of the supplied finite trace, all
+against the hash-bound finite subject.
+
+Nonclaims: signature or authenticity; source-code or source-to-binary
+equivalence; producing-revision validity; shortest witness; relation
+minimality; context-assisted minimality; liveness; fairness; timing; or any
+unmodeled effect.
+
 ## `kerf.factor.v1`
 
 Used by `factor` to check a supplied context-relative boundary map.

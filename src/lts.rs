@@ -68,7 +68,7 @@ pub struct ContextState {
     pub transitions: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Limits {
     pub max_product_states: usize,
