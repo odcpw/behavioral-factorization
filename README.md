@@ -48,6 +48,30 @@ All analysis output is versioned JSON on stdout. Errors are typed JSON on
 stderr. Exact observations and emissions are opaque strings, avoiding hidden
 JSON numeric or canonicalization semantics.
 
+## Executable self-host falsifier
+
+`kerf-selfhost` runs the real `kerf` executable against the fixed corpus in
+`self-host/`. It checks raw exit code, stdout bytes, and stderr bytes for eight
+roles: successful validation, typed invalid input, resource-limit unknown,
+distinguishing witness, lawful and nearby unlawful factors, and equivalent and
+nearby inequivalent recompositions. It also fails closed unless the requested
+Git HEAD matches and the repository is clean:
+
+```bash
+cargo build --bins --locked
+target/debug/kerf-selfhost \
+  --kerf "$PWD/target/debug/kerf" \
+  --repo-root "$PWD" \
+  --expect-head <40-lowercase-hex-Git-HEAD> \
+  --corpus "$PWD/self-host/corpus.json"
+```
+
+The adapter binds an observed executable hash to one repository revision and
+one corpus run. It is a regression falsifier and frontend seed, not a proof of
+source-to-binary reproducibility, source-program equivalence, or corpus
+completeness. `--allow-dirty` exists for development and reports the dirty
+state; it is not revision-bound evidence.
+
 ## Why there is no simulator dependency
 
 The v0.1 proof kernel is finite and discrete. FrankenSim was evaluated as a

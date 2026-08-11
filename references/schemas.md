@@ -36,6 +36,55 @@ LTS, factor, and recomposition semantic maps reject duplicate object member
 names. A parser that silently keeps the first or last duplicate could otherwise
 make textual declaration order change a verdict.
 
+## Executable self-host corpus
+
+`kerf-selfhost` consumes `kerf.self-host-corpus.v1`, separate from the semantic
+kernel inputs:
+
+```json
+{
+  "schema_version": "kerf.self-host-corpus.v1",
+  "cases": [
+    {
+      "id": "successful-lts",
+      "role": "successful_lts",
+      "operation": "validate-lts",
+      "input": "process.lts.json",
+      "expected": {
+        "exit_code": 0,
+        "stdout_hex": "...",
+        "stderr_hex": ""
+      }
+    }
+  ]
+}
+```
+
+Version 1 requires exactly one case for each of eight roles. Roles fix the
+operation, exit class, result stream, envelope status, semantic verdict, and,
+where applicable, a non-null witness or factor representation. Input paths are
+relative regular files confined to the corpus directory. The frozen protected
+observation is the tuple `(exit_code, stdout_bytes, stderr_bytes)`; lowercase
+hex is only its lossless JSON encoding. JSON parsing validates each declared
+role but does not replace raw-byte comparison.
+
+`kerf.self-host-result.v1` reports the expected and observed Git HEAD, dirty
+state, SHA-256 of the executable and corpus manifest, every input hash, the
+actual process tuple including Unix raw wait status where available, and exact
+mismatch fields. Exit `0` means all tuples matched, `1` is a checked tuple
+mismatch, `2` is invalid input or I/O failure, and `4` is an internal failure.
+The default rejects a dirty repository. `--allow-dirty` permits development
+runs but cannot establish exact-revision evidence.
+
+Exact claim: at the observed repository HEAD, the selected local executable
+with the reported hash produced the declared raw process observations on the
+fixed corpus in that run.
+
+Nonclaims: reproducible derivation of that executable from the revision;
+source-program equivalence; behavior outside the corpus; model, factor,
+readout, contract, architecture, or migration inference; sandboxing,
+termination, or output bounds; and operating-system or hardware normalization.
+
 ## `kerf.lts.v1`
 
 Used by `validate-lts` and `quotient`.

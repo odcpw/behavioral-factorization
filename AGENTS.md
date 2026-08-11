@@ -28,10 +28,10 @@ This file adds only repository-specific rules to
   positive proof.
 - Cost coordinates retain their units and use Pareto order. Do not introduce
   hidden weights, floating-point tolerances, or an "architecture energy."
-- Exact outputs are deterministic, versioned, and bound to the input hash. LTS
-  exploration is explicitly bounded; a resource limit returns `unknown`, never
-  success. No output is implementation-revision-bound until the envelope gains
-  a checked kernel identity.
+- Primary `kerf` outputs are deterministic, versioned, and bound to the input
+  hash. LTS exploration is explicitly bounded; a resource limit returns
+  `unknown`, never success. The separate self-host envelope checks Git HEAD and
+  executable hash but does not prove source-to-binary derivation.
 
 ## Architecture
 
@@ -48,6 +48,8 @@ This file adds only repository-specific rules to
 - `src/report.rs` owns typed domain errors and input hashing.
 - `src/main.rs` owns argument routing, file I/O, and versioned result/error
   envelopes with execution context.
+- `src/self_host.rs`, `src/bin/kerf-selfhost.rs`, and `self-host/` own the
+  revision-checked raw-process corpus falsifier. It is not a source analyzer.
 - `examples/` are discriminating microcases; `references/` separates theorem,
   engineering inference, conjecture, and broken metaphor.
 
@@ -63,6 +65,9 @@ This file adds only repository-specific rules to
   cargo clippy --all-targets --all-features --locked -- -D warnings
   jsm validate . --json
   ```
+
+  A clean self-host evidence run additionally builds both binaries and invokes
+  `kerf-selfhost` with the exact 40-hex `HEAD` and `self-host/corpus.json`.
 
 - For each semantic algorithm, test a nearby positive case, a shortest negative
   witness, invalid input, unreachable state handling, deterministic ordering,

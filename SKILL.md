@@ -134,6 +134,12 @@ returns unknown. `minimum_product_monitor_state_bits` counts the joint
 machine×context realization; it is not a machine- or seam-owned state lower
 bound when the context monitor is external side information.
 
+For the repository's fixed executable regression falsifier, run
+`kerf-selfhost` with an explicit `--kerf`, `--repo-root`, `--expect-head`, and
+`--corpus`. A clean-tree pass binds raw exit/stdout/stderr observations to one
+Git HEAD and executable hash. It does not prove source-to-binary derivation or
+generalize beyond the corpus; see [schemas.md](references/schemas.md).
+
 ### 4. Factor through explicit ports
 
 A component boundary must expose all and only the state, actions, order,
