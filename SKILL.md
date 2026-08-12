@@ -283,6 +283,20 @@ Use nearby positive and negative controls. Perturb rare paths, workloads,
 evidence layers, placement, and migration order. Prefer a truthful
 underdetermined result to architectural astrology.
 
+Return every shortest witness, rejected candidate, resource-limit unknown, and
+finite coverage count to the calling semantic campaign. Do not ask the user to
+rerun the same deterministic finite check. Re-run only when its subject,
+context, candidate set, mutation/challenge suite, or resource bound changed.
+An exhausted declared finite universe may support a bounded fixed point; an
+unchanged result hash is idempotence, not universal completeness.
+
+When a campaign asks for one-pass depth, treat the request as one outer
+invocation containing adaptive finite checks. Attack distinct behavioral laws
+rather than repeatedly reviewing the same source: boundary comparisons,
+authority substitution, history/reseed behavior, ordering versus set
+semantics, identity, and nearby invalid maps. A mutation score is a harness
+diagnostic and never correctness evidence.
+
 ## Non-negotiable guardrails
 
 - Hard semantics and missing proof are not finite costs.
