@@ -126,6 +126,7 @@ For finite deterministic models use `kerf`:
 kerf quotient model.lts.json
 kerf distinguish pair.compare.json
 kerf factor proposed.factor.json
+kerf search-factors bounded.factor-search.json
 kerf recompose proposed.recompose.json
 ```
 
@@ -169,6 +170,14 @@ boundary state factor through `q`. The context monitor remains external side
 information and may select different enabled-action domains. Passing proves
 only that `(q, id_context)` factors that supplied reachable finite product; it
 does not infer or minimize `q`.
+
+When the reachable finite product itself is supplied, `kerf search-factors`
+enumerates its set partitions in ascending boundary cardinality using canonical
+restricted-growth labels and admits them through the same factor laws. A
+minimum is exact only after every smaller represented partition is rejected;
+candidate or product exhaustion is `unknown`. This is bounded finite ground
+truth, not source extraction, heuristic architecture search, or a real-system
+global optimum.
 
 `kerf recompose` checks the inverse supplied finite direction. Each factor
 representation carries the context language under which its coordinates were

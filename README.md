@@ -15,6 +15,7 @@ models. LTS exploration has explicit state, pair, and witness-depth limits:
 - compare two machines and return a shortest distinguishing action word;
 - locally verify a hash-bound finite relation, witness, or recorded trace;
 - check whether a supplied context-relative map is a lawful behavioral factor;
+- exhaustively find a minimum lawful factor map within explicit finite bounds;
 - recompose named certified factors synchronously and compare the reachable
   behavior with a total reference;
 - validate explicit assignment, separation, pin, and authority constraints;
@@ -36,16 +37,17 @@ contextual state, protocol, and routed cost—not a universal scalar.
 
 ```bash
 cargo test --all-targets --locked
-cargo run --quiet -- quotient examples/toggle.lts.json | jq
-cargo run --quiet -- distinguish examples/rng-order.compare.json | jq
-cargo run --quiet -- verify-certificate examples/simple-equivalence.cert.json | jq
-cargo run --quiet -- verify-certificate examples/rng-order.witness.cert.json | jq
-cargo run --quiet -- verify-certificate examples/toggle.trace.cert.json | jq
-cargo run --quiet -- factor examples/context-side-information.factor.json | jq
-cargo run --quiet -- recompose examples/context-side-information.recompose.json | jq
-cargo run --quiet -- recompose examples/two-factor.recompose.json | jq
-cargo run --quiet -- pareto examples/architecture.candidates.json | jq
-cargo run --quiet -- score-routes examples/memory.transport.json | jq
+cargo run --quiet --bin kerf -- quotient examples/toggle.lts.json | jq
+cargo run --quiet --bin kerf -- distinguish examples/rng-order.compare.json | jq
+cargo run --quiet --bin kerf -- verify-certificate examples/simple-equivalence.cert.json | jq
+cargo run --quiet --bin kerf -- verify-certificate examples/rng-order.witness.cert.json | jq
+cargo run --quiet --bin kerf -- verify-certificate examples/toggle.trace.cert.json | jq
+cargo run --quiet --bin kerf -- factor examples/context-side-information.factor.json | jq
+cargo run --quiet --bin kerf -- search-factors self-host/process.factor-search.json | jq
+cargo run --quiet --bin kerf -- recompose examples/context-side-information.recompose.json | jq
+cargo run --quiet --bin kerf -- recompose examples/two-factor.recompose.json | jq
+cargo run --quiet --bin kerf -- pareto examples/architecture.candidates.json | jq
+cargo run --quiet --bin kerf -- score-routes examples/memory.transport.json | jq
 ```
 
 All analysis output is versioned JSON on stdout. Errors are typed JSON on

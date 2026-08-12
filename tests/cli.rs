@@ -92,6 +92,51 @@ fn factor_example_retains_context_side_information() {
 }
 
 #[test]
+fn factor_search_finds_the_self_host_process_minimum() {
+    let output = run("search-factors", "self-host/process.factor-search.json");
+    assert_eq!(output["operation"], "search-factors");
+    assert_eq!(output["status"], "ok");
+    assert_eq!(output["limits"]["max_candidates"], 15);
+    assert_eq!(output["result"]["verdict"], "minimum_found");
+    assert_eq!(output["result"]["minimum"]["boundary_state_count"], 2);
+    assert_eq!(output["result"]["minimum"]["global_candidate_ordinal"], 2);
+    assert_eq!(
+        output["result"]["coverage"]["completed_cardinalities"][0]["candidates_evaluated"],
+        1
+    );
+}
+
+#[test]
+fn factor_search_candidate_limit_is_unknown_with_partial_coverage() {
+    let mut input: Value = serde_json::from_slice(
+        &std::fs::read(repo_path("self-host/process.factor-search.json"))
+            .expect("example must read"),
+    )
+    .expect("example must be JSON");
+    input["limits"]["max_candidates"] = serde_json::json!(1);
+    let output = run_value("search-factors", &input);
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).expect("stderr must be JSON");
+    assert_eq!(error["status"], "unknown");
+    assert_eq!(error["operation"], "search-factors");
+    assert_eq!(error["limits"]["max_candidates"], 1);
+    assert_eq!(error["error"]["details"]["minimum"], Value::Null);
+    assert_eq!(
+        error["error"]["details"]["coverage"]["evaluated_candidates"],
+        1
+    );
+    assert_eq!(
+        error["error"]["details"]["current_cardinality"]["boundary_state_count"],
+        2
+    );
+    assert_eq!(
+        error["error"]["details"]["current_cardinality"]["candidates_evaluated"],
+        0
+    );
+}
+
+#[test]
 fn one_factor_recomposition_is_exact_under_its_certified_context() {
     let output = run(
         "recompose",

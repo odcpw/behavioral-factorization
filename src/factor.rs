@@ -22,7 +22,7 @@ pub struct FactorInput {
     pub limits: FactorLimits,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct FactorMapEntry {
     pub machine_state: String,
@@ -171,19 +171,32 @@ pub fn check(input: &FactorInput) -> Result<FactorResult, ToolError> {
         boundary_by_node.push(boundary_state.clone());
     }
 
-    let unreachable_machine_states = unreachable_machine_states(&machine, &graph);
-    let mut groups = BTreeMap::<String, Vec<usize>>::new();
-    for (node_index, boundary_state) in boundary_by_node.iter().enumerate() {
-        groups
-            .entry(boundary_state.clone())
-            .or_default()
-            .push(node_index);
-    }
+    evaluate_partition(
+        &machine,
+        input.context.as_ref(),
+        &context,
+        &graph,
+        &access,
+        &boundary_by_node,
+    )
+}
 
-    let conflicts = find_conflicts(&machine, &graph, &boundary_by_node, &groups);
+pub(crate) fn evaluate_partition(
+    machine: &crate::lts::IndexedMachine,
+    certified_context: Option<&ContextMonitor>,
+    context: &crate::lts::IndexedContext,
+    graph: &ProductGraph,
+    access: &ProductAccess,
+    boundary_by_node: &[String],
+) -> Result<FactorResult, ToolError> {
+    let context_present = certified_context.is_some();
+    let unreachable_machine_states = unreachable_machine_states(machine, graph);
+    let groups = partition_groups(graph, boundary_by_node)?;
+
+    let conflicts = find_conflicts(machine, graph, boundary_by_node, &groups, false);
     if let Some(conflict) = conflicts
         .into_iter()
-        .min_by(|left, right| compare_conflicts(left, right, &access))
+        .min_by(|left, right| compare_conflicts(left, right, access))
     {
         return Ok(FactorResult {
             algorithm: "context_retained_factor_map_v1",
@@ -195,23 +208,18 @@ pub fn check(input: &FactorInput) -> Result<FactorResult, ToolError> {
             representation: None,
             witness: Some(witness_from_conflict(
                 conflict,
-                input.context.is_some(),
-                &machine,
-                &context,
-                &graph,
-                &access,
+                context_present,
+                machine,
+                context,
+                graph,
+                access,
             )),
             nonclaims: factor_nonclaims(),
         });
     }
 
-    let representation = build_representation(
-        &machine,
-        input.context.as_ref(),
-        &graph,
-        &boundary_by_node,
-        &groups,
-    );
+    let representation =
+        build_representation(machine, certified_context, graph, boundary_by_node, &groups);
     Ok(FactorResult {
         algorithm: "context_retained_factor_map_v1",
         lawful: true,
@@ -223,6 +231,51 @@ pub fn check(input: &FactorInput) -> Result<FactorResult, ToolError> {
         witness: None,
         nonclaims: factor_nonclaims(),
     })
+}
+
+pub(crate) fn admit_partition(
+    machine: &crate::lts::IndexedMachine,
+    certified_context: Option<&ContextMonitor>,
+    graph: &ProductGraph,
+    boundary_by_node: &[String],
+) -> Result<Option<BoundaryRepresentation>, ToolError> {
+    let groups = partition_groups(graph, boundary_by_node)?;
+    if find_conflicts(machine, graph, boundary_by_node, &groups, true).is_empty() {
+        Ok(Some(build_representation(
+            machine,
+            certified_context,
+            graph,
+            boundary_by_node,
+            &groups,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn partition_groups(
+    graph: &ProductGraph,
+    boundary_by_node: &[String],
+) -> Result<BTreeMap<String, Vec<usize>>, ToolError> {
+    if boundary_by_node.len() != graph.nodes.len() {
+        return Err(ToolError::internal(
+            "factor partition length does not match reachable product",
+        ));
+    }
+    if boundary_by_node.iter().any(String::is_empty) {
+        return Err(ToolError::internal(
+            "factor partition contains an empty boundary-state ID",
+        ));
+    }
+
+    let mut groups = BTreeMap::<String, Vec<usize>>::new();
+    for (node_index, boundary_state) in boundary_by_node.iter().enumerate() {
+        groups
+            .entry(boundary_state.clone())
+            .or_default()
+            .push(node_index);
+    }
+    Ok(groups)
 }
 
 fn validate_factor_map_structure(
@@ -341,7 +394,7 @@ fn validate_factor_map_domain(
     Ok(())
 }
 
-fn source_for_node(
+pub(crate) fn source_for_node(
     context_present: bool,
     node: &crate::lts::ProductState,
     machine: &crate::lts::IndexedMachine,
@@ -374,6 +427,7 @@ fn find_conflicts(
     graph: &ProductGraph,
     boundary_by_node: &[String],
     groups: &BTreeMap<String, Vec<usize>>,
+    stop_after_first: bool,
 ) -> Vec<Conflict> {
     let mut conflicts = Vec::new();
     for (boundary_state, members) in groups {
@@ -391,6 +445,9 @@ fn find_conflicts(
                     left_value: first_observation.clone(),
                     right_value: observation.clone(),
                 });
+                if stop_after_first {
+                    return conflicts;
+                }
             }
         }
 
@@ -418,6 +475,9 @@ fn find_conflicts(
                         left_value: (*first_emission).clone(),
                         right_value: (*emission).clone(),
                     });
+                    if stop_after_first {
+                        return conflicts;
+                    }
                 }
                 let successor = &boundary_by_node[*target];
                 if successor != first_successor {
@@ -430,6 +490,9 @@ fn find_conflicts(
                         left_value: first_successor.clone(),
                         right_value: successor.clone(),
                     });
+                    if stop_after_first {
+                        return conflicts;
+                    }
                 }
             }
         }

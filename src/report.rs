@@ -9,6 +9,8 @@ use std::marker::PhantomData;
 pub struct ToolError {
     pub code: &'static str,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Box<serde_json::Value>>,
 }
 
 impl ToolError {
@@ -17,6 +19,7 @@ impl ToolError {
         Self {
             code: "invalid_input",
             message: message.into(),
+            details: None,
         }
     }
 
@@ -25,6 +28,19 @@ impl ToolError {
         Self {
             code: "resource_limit",
             message: message.into(),
+            details: None,
+        }
+    }
+
+    #[must_use]
+    pub fn resource_limit_with_details(
+        message: impl Into<String>,
+        details: serde_json::Value,
+    ) -> Self {
+        Self {
+            code: "resource_limit",
+            message: message.into(),
+            details: Some(Box::new(details)),
         }
     }
 
@@ -33,6 +49,7 @@ impl ToolError {
         Self {
             code: "io_error",
             message: message.into(),
+            details: None,
         }
     }
 
@@ -41,6 +58,7 @@ impl ToolError {
         Self {
             code: "internal_invariant",
             message: message.into(),
+            details: None,
         }
     }
 }

@@ -2,6 +2,7 @@ use kerf::TOOL_VERSION;
 use kerf::candidates::{self, CandidateInput};
 use kerf::cert::{self, CertificateInput};
 use kerf::factor::{self, FactorInput, FactorLimits};
+use kerf::factor_search::{self, FactorSearchInput, FactorSearchLimits};
 use kerf::lts::{self, CompareInput, Limits, LtsInput};
 use kerf::recompose::{self, RecomposeInput};
 use kerf::report::{ToolError, sha256_hex};
@@ -21,6 +22,7 @@ const RESULT_SCHEMA: &str = "kerf.result.v1";
 enum AppliedLimits {
     Lts(Limits),
     Factor(FactorLimits),
+    FactorSearch(FactorSearchLimits),
 }
 
 #[derive(Serialize)]
@@ -36,7 +38,7 @@ struct ResultEnvelope<T> {
 
 #[derive(Debug)]
 struct ExecutionError {
-    error: ToolError,
+    error: Box<ToolError>,
     operation: Option<String>,
     input_sha256: Option<String>,
     limits: Option<AppliedLimits>,
@@ -99,9 +101,9 @@ fn run() -> Result<(), ExecutionError> {
                 .ok_or_else(|| bare_error(ToolError::invalid("command must be valid UTF-8")))?;
             if !is_command(command) {
                 return Err(ExecutionError {
-                    error: ToolError::invalid(format!(
+                    error: Box::new(ToolError::invalid(format!(
                         "unknown command {command:?}; run kerf --help"
-                    )),
+                    ))),
                     operation: Some(command.to_owned()),
                     input_sha256: None,
                     limits: None,
@@ -110,7 +112,7 @@ fn run() -> Result<(), ExecutionError> {
             dispatch(command, Path::new(path))
         }
         _ => Err(bare_error(ToolError::invalid(
-            "usage: kerf <validate-lts|quotient|distinguish|factor|recompose|verify-certificate|validate-candidates|pareto|score-routes> <input.json>",
+            "usage: kerf <validate-lts|quotient|distinguish|factor|search-factors|recompose|verify-certificate|validate-candidates|pareto|score-routes> <input.json>",
         ))),
     }
 }
@@ -122,6 +124,7 @@ fn is_command(command: &str) -> bool {
             | "quotient"
             | "distinguish"
             | "factor"
+            | "search-factors"
             | "recompose"
             | "verify-certificate"
             | "validate-candidates"
@@ -132,7 +135,10 @@ fn is_command(command: &str) -> bool {
 
 fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
     let bytes = fs::read(path).map_err(|error| ExecutionError {
-        error: ToolError::io(format!("could not read {}: {error}", path.display())),
+        error: Box::new(ToolError::io(format!(
+            "could not read {}: {error}",
+            path.display()
+        ))),
         operation: Some(command.to_owned()),
         input_sha256: None,
         limits: None,
@@ -171,6 +177,15 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
                 parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
             let limits = Some(AppliedLimits::Factor(input.limits));
             let result = factor::check(&input)
+                .map_err(|error| contextual(error, command, &input_sha256, limits))?;
+            emit(command, input_sha256.clone(), limits, result)
+                .map_err(|error| contextual(error, command, &input_sha256, limits))
+        }
+        "search-factors" => {
+            let input: FactorSearchInput =
+                parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
+            let limits = Some(AppliedLimits::FactorSearch(input.limits));
+            let result = factor_search::search(&input)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))?;
             emit(command, input_sha256.clone(), limits, result)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))
@@ -222,7 +237,7 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
 
 fn bare_error(error: ToolError) -> ExecutionError {
     ExecutionError {
-        error,
+        error: Box::new(error),
         operation: None,
         input_sha256: None,
         limits: None,
@@ -236,7 +251,7 @@ fn contextual(
     limits: Option<AppliedLimits>,
 ) -> ExecutionError {
     ExecutionError {
-        error,
+        error: Box::new(error),
         operation: Some(operation.to_owned()),
         input_sha256: Some(input_sha256.to_owned()),
         limits,
@@ -289,6 +304,7 @@ COMMANDS:\n\
   quotient              Compute its reachable observational quotient\n\
   distinguish           Compare two kerf.compare.v1 machines and emit a shortest witness\n\
   factor                Check a supplied context-relative boundary-state map\n\
+  search-factors        Find an exact bounded minimum lawful factor map\n\
   recompose             Check exact reachable synchronous recomposition\n\
   verify-certificate    Locally verify a finite relation, witness, or trace\n\
   validate-candidates   Check explicit assignment and authority constraints\n\

@@ -39,6 +39,8 @@ This file adds only repository-specific rules to
   equivalence witnesses, and observational quotienting.
 - `src/factor.rs` checks supplied context-relative factor maps and emits their
   induced partial boundary representations or shortest conflict witnesses.
+- `src/factor_search.rs` enumerates bounded restricted-growth partitions and
+  admits them through the same factor laws; candidate exhaustion is unknown.
 - `src/recompose.rs` synchronizes certified factor contexts, constructs only
   the proved-reachable synchronous product, and compares it with a reference.
 - `src/cert.rs` locally checks hash-bound finite relations, inequivalence

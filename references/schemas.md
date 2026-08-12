@@ -17,9 +17,10 @@ All successful analysis commands write one JSON object to stdout:
 ```
 
 Errors are one typed `kerf.error.v1` object on stderr. Errors discovered after
-input hashing retain the operation and input hash; LTS analysis errors also
+input hashing retain the operation and input hash; bounded analysis errors also
 retain the applied limits. Reaching a configured analysis bound has
-`status: "unknown"`.
+`status: "unknown"`. An operation may add deterministic partial coverage under
+`error.details`; its absence preserves the ordinary error shape.
 Exit codes:
 
 - `0`: valid analysis completed, including an infeasible candidate report;
@@ -378,6 +379,63 @@ observations and emissions.
 Nonclaims: minimum boundary cardinality; validity under larger contexts;
 source-program equivalence; liveness; fairness; timing; causality; or any
 unmodeled effect.
+
+## `kerf.factor-search.v1`
+
+Used by `search-factors` to exhaustively enumerate bounded factor maps over one
+reachable finite machine-by-context product.
+
+```json
+{
+  "schema_version": "kerf.factor-search.v1",
+  "machine": {"initial": "...", "actions": [], "states": []},
+  "context": {"initial": "...", "states": []},
+  "limits": {
+    "max_boundary_states": 8,
+    "max_product_states": 1000000,
+    "max_candidates": 1000000
+  }
+}
+```
+
+All three limits are required and positive. Product exploration uses the same
+sorted-action breadth-first order as `factor`; its reachable sources are the
+fixed element order for the search. For each boundary cardinality `k` from one
+through `min(max_boundary_states, reachable_product_states)`, the search emits
+restricted-growth strings in lexical order. Labels are nonnegative, the first
+is zero, and each later label is at most one plus the preceding maximum. Keeping
+exactly strings with maximum `k - 1` gives every unlabeled `k`-block set
+partition exactly once.
+
+Each retained partition consumes one candidate and is decided by the same
+factor-law kernel as `factor`. The first lawful map at `k` establishes a
+minimum cardinality only because all smaller cardinalities were completely
+enumerated and rejected. The successful result contains the canonical source
+order, exact counts for completed cardinalities, the successful candidate's
+one-based local and global ordinals, its map, and its checked
+`kerf.factor-representation.v2`. If every partition through the effective
+boundary limit is rejected, the result claims only that bounded negative.
+
+The cumulative candidate budget is checked only when another retained
+partition exists. A budget exactly equal to the last candidate of the entire
+requested search therefore permits a completed bounded negative, and a budget
+exactly equal to a successful candidate permits the minimum. If another
+candidate exists after the budget is consumed, exit `3` returns `unknown` with
+`kerf.factor-search-coverage.v1` under `error.details`: completed-cardinality
+counts, the partial current count, canonical source order, and `minimum: null`.
+Product-bound exhaustion is likewise unknown and is never counted as a rejected
+partition.
+
+Exact claim: a reported minimum is the least lawful boundary cardinality among
+all set partitions of the supplied reachable finite product under the existing
+factor laws. A completed bounded negative excludes lawful partitions only up to
+the effective boundary limit.
+
+Nonclaims: source-code inference or equivalence; a globally optimal real
+architecture; transport, placement, scheduling, Pareto, or migration quality;
+probabilistic behavior; or any natural-system objective. Candidate bounds count
+retained partition evaluations; generation and checking still scale with the
+reachable product size.
 
 ## `kerf.recompose.v1`
 

@@ -1,6 +1,7 @@
 pub mod candidates;
 pub mod cert;
 pub mod factor;
+pub mod factor_search;
 pub mod lts;
 pub mod recompose;
 pub mod report;
