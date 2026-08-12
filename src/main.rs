@@ -4,6 +4,7 @@ use kerf::cert::{self, CertificateInput};
 use kerf::factor::{self, FactorInput, FactorLimits};
 use kerf::factor_search::{self, FactorSearchInput, FactorSearchLimits};
 use kerf::lts::{self, CompareInput, Limits, LtsInput};
+use kerf::morphism::{self, MorphismInput, MorphismLimits};
 use kerf::recompose::{self, RecomposeInput};
 use kerf::report::{ToolError, sha256_hex};
 use kerf::transport::{self, TransportInput};
@@ -23,6 +24,7 @@ enum AppliedLimits {
     Lts(Limits),
     Factor(FactorLimits),
     FactorSearch(FactorSearchLimits),
+    Morphism(MorphismLimits),
 }
 
 #[derive(Serialize)]
@@ -112,7 +114,7 @@ fn run() -> Result<(), ExecutionError> {
             dispatch(command, Path::new(path))
         }
         _ => Err(bare_error(ToolError::invalid(
-            "usage: kerf <validate-lts|quotient|distinguish|factor|search-factors|recompose|verify-certificate|validate-candidates|pareto|score-routes> <input.json>",
+            "usage: kerf <validate-lts|quotient|distinguish|factor|search-factors|recompose|check-morphism|verify-certificate|validate-candidates|pareto|score-routes> <input.json>",
         ))),
     }
 }
@@ -126,6 +128,7 @@ fn is_command(command: &str) -> bool {
             | "factor"
             | "search-factors"
             | "recompose"
+            | "check-morphism"
             | "verify-certificate"
             | "validate-candidates"
             | "pareto"
@@ -199,6 +202,7 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
             emit(command, input_sha256.clone(), limits, result)
                 .map_err(|error| contextual(error, command, &input_sha256, limits))
         }
+        "check-morphism" => dispatch_morphism(&bytes, command, &input_sha256),
         "verify-certificate" => {
             let input: CertificateInput =
                 parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
@@ -233,6 +237,20 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
         }
         _ => unreachable!("command validated before input is read"),
     }
+}
+
+fn dispatch_morphism(
+    bytes: &[u8],
+    command: &str,
+    input_sha256: &str,
+) -> Result<(), ExecutionError> {
+    let input: MorphismInput =
+        parse(bytes).map_err(|error| contextual(error, command, input_sha256, None))?;
+    let limits = morphism::applied_limits(&input).map(AppliedLimits::Morphism);
+    let result = morphism::check(&input)
+        .map_err(|error| contextual(error, command, input_sha256, limits))?;
+    emit(command, input_sha256.to_owned(), limits, result)
+        .map_err(|error| contextual(error, command, input_sha256, limits))
 }
 
 fn bare_error(error: ToolError) -> ExecutionError {
@@ -306,6 +324,7 @@ COMMANDS:\n\
   factor                Check a supplied context-relative boundary-state map\n\
   search-factors        Find an exact bounded minimum lawful factor map\n\
   recompose             Check exact reachable synchronous recomposition\n\
+  check-morphism        Check a supplied exact finite machine morphism\n\
   verify-certificate    Locally verify a finite relation, witness, or trace\n\
   validate-candidates   Check explicit assignment and authority constraints\n\
   pareto                Compute the exact frontier of the supplied candidate set\n\

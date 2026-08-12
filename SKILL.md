@@ -128,6 +128,7 @@ kerf distinguish pair.compare.json
 kerf factor proposed.factor.json
 kerf search-factors bounded.factor-search.json
 kerf recompose proposed.recompose.json
+kerf check-morphism proposed.morphism.json
 ```
 
 These commands certify only the supplied finite models. A resource limit
@@ -190,6 +191,15 @@ remains an inequivalence even if another word is unproved; the result reports
 both and states whether witness minimality is completion-robust or only within
 the proved region. This checks supplied representations, not their producer
 provenance; locally checkable proof bundles are a separate layer.
+
+When a total finite state function is already supplied, `kerf check-morphism`
+checks the pointed observation/emission/transition laws either over every
+declared source state or over the reachable source-by-context product. Global
+carrier surjectivity, exact all-state isomorphism, and a supplied section's
+right-inverse, reverse-morphism, and two-sided-inverse properties remain
+separate results. Reachable failures have shortest exposing words; an
+unreachable all-state failure has a canonical coordinate and no invented
+trace. The command checks maps but never infers one.
 
 ### 5. Separate irreducible flow from demonstrated waste
 

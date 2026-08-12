@@ -33,9 +33,9 @@ observations and emissions are opaque UTF-8 strings. Rates and costs use exact
 unsigned integer or rational strings; no binary floating point or tolerance is
 part of v0.1.
 
-LTS, factor, and recomposition semantic maps reject duplicate object member
-names. A parser that silently keeps the first or last duplicate could otherwise
-make textual declaration order change a verdict.
+LTS, factor, recomposition, and morphism semantic maps reject duplicate object
+member names. A parser that silently keeps the first or last duplicate could
+otherwise make textual declaration order change a verdict.
 
 ## Executable self-host corpus
 
@@ -164,6 +164,101 @@ lexicographic tie-breaking.
 
 If a configured pair or witness-depth bound prevents a decision, exit `3`
 reports unknown. It never reports equivalent after truncation.
+
+## `kerf.morphism.v1`
+
+Used by `check-morphism` to check one supplied total state function between two
+finite deterministic machines. The machines use the same canonical action
+alphabet and opaque observation and emission strings.
+
+```json
+{
+  "schema_version": "kerf.morphism.v1",
+  "morphism": {
+    "source": {"initial": "s0", "actions": ["tick"], "states": []},
+    "target": {"initial": "t0", "actions": ["tick"], "states": []},
+    "state_map": [
+      {"source_state": "s0", "target_state": "t0"}
+    ]
+  },
+  "scope": {
+    "kind": "reachable_under_context",
+    "context": null,
+    "limits": {"max_product_states": 1000000}
+  },
+  "claims": ["carrier_surjectivity"],
+  "section": {
+    "state_map": [
+      {"target_state": "t0", "source_state": "s0"}
+    ],
+    "claims": ["as_morphism", "two_sided_inverse"]
+  }
+}
+```
+
+The alternate scope is exactly `{"kind":"all_states"}`. Both state maps are
+structurally total over their declared domains even in reachable mode. Missing,
+duplicate, empty, or unknown entries are invalid; maps are never inferred.
+Claim names are unique. A missing context means that every action is enabled.
+The reachable product bound is positive and applies independently to the base
+source-by-context traversal and a requested reverse section-by-context
+traversal. Discovering another product state beyond the bound is unknown; exact
+closure at the bound succeeds. All-state checking performs no product search
+and has no applied limit. Structural validation and complete requested
+reachable traversal precede a semantic verdict, so a truncated graph never
+emits even an apparently exposed failure as a completed bounded result.
+
+For source machine `S`, target `T`, and supplied `f:S→T`, the base all-state
+claim is the pointed coalgebra law:
+
+```text
+f(s_initial) = t_initial
+observation_T(f(s)) = observation_S(s)
+emission_T(f(s), a) = emission_S(s, a)
+f(successor_S(s, a)) = successor_T(f(s), a)
+```
+
+Reachable scope checks the lifted function `f × id_context` only at reachable
+`(source_state, context_state)` pairs and only for context-enabled actions. A
+passing reachable result therefore preserves every finite observation and
+emission trace in that declared action language. It does not check or make a
+claim about listed `unchecked_domain_states` or disabled actions.
+
+Reachable failures use the shortest exposing action word in shortlex order.
+At one word, successor observation precedes emission, which precedes transition
+commutation. An all-state failure on an unreachable state cannot have a
+reachable access trace; its witness instead uses canonical source-state and
+action order, sets `word` and `length_actions` to null, and labels its basis
+`canonical_all_state_coordinate`. Initial preservation always has the empty
+word. A false law is a completed analysis on stdout with exit `0`.
+
+Optional claims do not silently strengthen the selected behavioral scope:
+
+- `carrier_surjectivity` checks the global declared carriers and reports the
+  lexicographically least target state outside `image(f)`;
+- `exact_isomorphism` is valid only in all-state scope and requires the base
+  morphism plus global injectivity and surjectivity. A bijective coalgebra
+  morphism has a morphic inverse, but this claim neither infers nor emits it;
+- supplying `section.state_map` always checks the global right-inverse law
+  `f(g(t))=t`, reporting the least failing target;
+- section claim `as_morphism` checks `g:T→S` directionally under the same
+  selected scope and, in reachable mode, its own bounded target-by-context
+  traversal; and
+- section claim `two_sided_inverse` separately adds the global left-inverse law
+  `g(f(s))=s`. Its `holds` value requires both inverse laws.
+
+A right inverse proves carrier surjectivity but neither injectivity nor that the
+section is a morphism. A global carrier claim may use states left unchecked by
+a reachable behavioral theorem; the output keeps those facts separate. The
+finite coalgebra basis is summarized in Rutten's *Universal Coalgebra*, listed
+in [sources.md](sources.md).
+
+Exact claim: the reported laws and global set properties of the supplied finite
+machines and supplied maps, under the named scope, context, and bound.
+
+Nonclaims: relational simulation; partial or context-dependent maps; action
+renaming; map or section synthesis; source-program semantics; minimality;
+liveness; fairness; timing; causality; or unmodeled effects.
 
 ## `kerf.certificate-check.v1`
 

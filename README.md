@@ -18,6 +18,8 @@ models. LTS exploration has explicit state, pair, and witness-depth limits:
 - exhaustively find a minimum lawful factor map within explicit finite bounds;
 - recompose named certified factors synchronously and compare the reachable
   behavior with a total reference;
+- check a supplied total state function as an all-state or context-reachable
+  finite machine morphism, with separately named carrier and section claims;
 - validate explicit assignment, separation, pin, and authority constraints;
 - compute the exact Pareto frontier of the represented-feasible supplied set; and
 - account checked rational load on declared static routes.

@@ -3,6 +3,7 @@ pub mod cert;
 pub mod factor;
 pub mod factor_search;
 pub mod lts;
+pub mod morphism;
 pub mod recompose;
 pub mod report;
 pub mod self_host;

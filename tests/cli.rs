@@ -42,6 +42,67 @@ fn run_value(command: &str, input: &Value) -> Output {
     output
 }
 
+fn morphism_example() -> Value {
+    serde_json::json!({
+        "schema_version": "kerf.morphism.v1",
+        "morphism": {
+            "source": {
+                "initial": "cold",
+                "actions": ["toggle"],
+                "states": [
+                    {
+                        "id": "cold",
+                        "observation": "off",
+                        "transitions": {
+                            "toggle": {"to": "hot", "emission": "changed"}
+                        }
+                    },
+                    {
+                        "id": "hot",
+                        "observation": "on",
+                        "transitions": {
+                            "toggle": {"to": "cold", "emission": "changed"}
+                        }
+                    }
+                ]
+            },
+            "target": {
+                "initial": "disabled",
+                "actions": ["toggle"],
+                "states": [
+                    {
+                        "id": "disabled",
+                        "observation": "off",
+                        "transitions": {
+                            "toggle": {"to": "enabled", "emission": "changed"}
+                        }
+                    },
+                    {
+                        "id": "enabled",
+                        "observation": "on",
+                        "transitions": {
+                            "toggle": {"to": "disabled", "emission": "changed"}
+                        }
+                    }
+                ]
+            },
+            "state_map": [
+                {"source_state": "cold", "target_state": "disabled"},
+                {"source_state": "hot", "target_state": "enabled"}
+            ]
+        },
+        "scope": {"kind": "all_states"},
+        "claims": ["carrier_surjectivity", "exact_isomorphism"],
+        "section": {
+            "state_map": [
+                {"target_state": "disabled", "source_state": "cold"},
+                {"target_state": "enabled", "source_state": "hot"}
+            ],
+            "claims": ["as_morphism", "two_sided_inverse"]
+        }
+    })
+}
+
 #[test]
 fn quotient_example_is_input_bound_json() {
     let output = run("quotient", "examples/toggle.lts.json");
@@ -134,6 +195,96 @@ fn factor_search_candidate_limit_is_unknown_with_partial_coverage() {
         error["error"]["details"]["current_cardinality"]["candidates_evaluated"],
         0
     );
+}
+
+#[test]
+fn morphism_example_reports_independent_exact_claims() {
+    let process = run_value("check-morphism", &morphism_example());
+    assert!(process.status.success());
+    assert!(process.stderr.is_empty());
+    let output: Value = serde_json::from_slice(&process.stdout).expect("stdout must be JSON");
+    assert_eq!(output["operation"], "check-morphism");
+    assert_eq!(output["limits"], Value::Null);
+    assert_eq!(output["result"]["morphism"]["holds"], true);
+    assert_eq!(output["result"]["carrier_surjectivity"]["holds"], true);
+    assert_eq!(output["result"]["exact_isomorphism"]["holds"], true);
+    assert_eq!(output["result"]["section"]["right_inverse"]["holds"], true);
+    assert_eq!(output["result"]["section"]["as_morphism"]["holds"], true);
+    assert_eq!(
+        output["result"]["section"]["two_sided_inverse"]["holds"],
+        true
+    );
+}
+
+#[test]
+fn reachable_morphism_failure_is_exit_zero_with_shortest_word() {
+    let mut input = morphism_example();
+    input["scope"] = serde_json::json!({
+        "kind": "reachable_under_context",
+        "context": null,
+        "limits": {"max_product_states": 2}
+    });
+    input["claims"] = serde_json::json!([]);
+    input
+        .as_object_mut()
+        .expect("input is an object")
+        .remove("section");
+    input["morphism"]["target"]["states"][0]["transitions"]["toggle"]["emission"] =
+        serde_json::json!("corrupt");
+    let output = run_value("check-morphism", &input);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("stdout must be JSON");
+    assert_eq!(result["result"]["morphism"]["holds"], false);
+    assert_eq!(
+        result["result"]["morphism"]["witness"]["law"],
+        "emission_preservation"
+    );
+    assert_eq!(
+        result["result"]["morphism"]["witness"]["word"],
+        serde_json::json!(["toggle"])
+    );
+}
+
+#[test]
+fn morphism_product_exhaustion_is_typed_unknown() {
+    let mut input = morphism_example();
+    input["scope"] = serde_json::json!({
+        "kind": "reachable_under_context",
+        "context": null,
+        "limits": {"max_product_states": 1}
+    });
+    input["claims"] = serde_json::json!([]);
+    input
+        .as_object_mut()
+        .expect("input is an object")
+        .remove("section");
+    let output = run_value("check-morphism", &input);
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).expect("stderr must be JSON");
+    assert_eq!(error["status"], "unknown");
+    assert_eq!(error["operation"], "check-morphism");
+    assert_eq!(error["limits"]["max_product_states"], 1);
+    assert_eq!(error["error"]["code"], "resource_limit");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.starts_with("base_morphism:"))
+    );
+}
+
+#[test]
+fn duplicate_morphism_claim_is_typed_invalid_input() {
+    let mut input = morphism_example();
+    input["claims"] = serde_json::json!(["carrier_surjectivity", "carrier_surjectivity"]);
+    let output = run_value("check-morphism", &input);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).expect("stderr must be JSON");
+    assert_eq!(error["status"], "error");
+    assert_eq!(error["operation"], "check-morphism");
+    assert_eq!(error["error"]["code"], "invalid_input");
 }
 
 #[test]
