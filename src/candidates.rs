@@ -238,7 +238,13 @@ struct ValidatedCandidate<'a> {
 struct PreparedMigration<'a> {
     contracts: BTreeMap<&'a str, &'a MigrationCarrierContract>,
     nodes: BTreeMap<&'a str, PreparedMigrationNode<'a>>,
-    edges: Vec<&'a MigrationEdge>,
+    edges: Vec<PreparedMigrationEdge<'a>>,
+}
+
+struct PreparedMigrationEdge<'a> {
+    edge: &'a MigrationEdge,
+    forward_verification: cert::CertificateResult,
+    reverse_verification: Option<cert::CertificateResult>,
 }
 
 struct PreparedMigrationNode<'a> {
@@ -350,15 +356,16 @@ pub fn pareto(input: &CandidateInput) -> Result<ParetoResult, ToolError> {
 ///
 /// # Errors
 ///
-/// Returns [`ToolError`] when the graph shape, IDs, machines, contexts, or
-/// endpoint references are invalid. A well-formed graph with a false edge
-/// claim or open cleanup sink is a completed result with `valid: false`.
+/// Returns [`ToolError`] when the graph shape, IDs, machines, contexts,
+/// endpoint references, or nested certificate inputs are invalid. A
+/// well-formed graph with a false edge claim or open cleanup sink is a
+/// completed result with `valid: false`.
 pub fn validate_migration(
     input: &MigrationGraphInput,
 ) -> Result<MigrationValidationResult, ToolError> {
     let prepared = prepare_migration(input)?;
     for (edge_index, edge) in prepared.edges.iter().enumerate() {
-        if let Some(violation) = validate_migration_edge(&prepared, edge) {
+        if let Some(violation) = validate_migration_edge(&prepared, edge)? {
             return Ok(migration_result(
                 input.nodes.len(),
                 edge_index + 1,
@@ -370,7 +377,7 @@ pub fn validate_migration(
     let outgoing: BTreeSet<&str> = prepared
         .edges
         .iter()
-        .map(|edge| edge.source.as_str())
+        .map(|edge| edge.edge.source.as_str())
         .collect();
     if let Some(node) = prepared
         .nodes
@@ -481,10 +488,22 @@ fn prepare_migration(input: &MigrationGraphInput) -> Result<PreparedMigration<'_
 
     validate_carrier_contracts(&contracts, &nodes)?;
     let node_ids: BTreeSet<&str> = nodes.keys().copied().collect();
-    let mut edges: Vec<&MigrationEdge> = input.edges.iter().collect();
-    edges.sort_by(|left, right| left.id.cmp(&right.id));
-    for edge in &edges {
+    let mut edge_inputs: Vec<&MigrationEdge> = input.edges.iter().collect();
+    edge_inputs.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut edges = Vec::with_capacity(edge_inputs.len());
+    for edge in edge_inputs {
         validate_migration_edge_shape(edge, &node_ids, &expected_carriers)?;
+        let forward_verification = cert::verify(&edge.evidence)?;
+        let reverse_verification = edge
+            .reverse_evidence
+            .as_ref()
+            .map(|reverse| cert::verify(&reverse.certificate))
+            .transpose()?;
+        edges.push(PreparedMigrationEdge {
+            edge,
+            forward_verification,
+            reverse_verification,
+        });
     }
 
     Ok(PreparedMigration {
@@ -611,8 +630,9 @@ fn validate_cleanup_transition_shape(
 
 fn validate_migration_edge(
     prepared: &PreparedMigration<'_>,
-    edge: &MigrationEdge,
-) -> Option<MigrationViolation> {
+    prepared_edge: &PreparedMigrationEdge<'_>,
+) -> Result<Option<MigrationViolation>, ToolError> {
+    let edge = prepared_edge.edge;
     let source = &prepared.nodes[edge.source.as_str()];
     let target = &prepared.nodes[edge.target.as_str()];
     let changed: Vec<&str> = prepared
@@ -625,7 +645,7 @@ fn validate_migration_edge(
         })
         .collect();
     if changed != [edge.affected_carrier.as_str()] {
-        return Some(edge_violation(
+        return Ok(Some(edge_violation(
             edge,
             Some(&edge.affected_carrier),
             "changed_carrier_set_mismatch",
@@ -633,7 +653,7 @@ fn validate_migration_edge(
                 ("declared", json!([edge.affected_carrier])),
                 ("actual", json!(changed)),
             ],
-        ));
+        )));
     }
 
     let authority_changes: Vec<&str> = prepared
@@ -648,12 +668,12 @@ fn validate_migration_edge(
         .iter()
         .any(|carrier_id| *carrier_id != edge.affected_carrier)
     {
-        return Some(edge_violation(
+        return Ok(Some(edge_violation(
             edge,
             Some(&edge.affected_carrier),
             "authority_change_outside_affected_carrier",
             [("actual", json!(authority_changes))],
-        ));
+        )));
     }
 
     let source_carrier = &source.carriers[edge.affected_carrier.as_str()];
@@ -666,8 +686,9 @@ fn validate_migration_edge(
         target_carrier,
         contract.required_context.as_ref(),
         "forward",
-    ) {
-        return Some(violation);
+        &prepared_edge.forward_verification,
+    )? {
+        return Ok(Some(violation));
     }
     if let Some(violation) = validate_authority_claim(
         edge,
@@ -676,7 +697,7 @@ fn validate_migration_edge(
         &target_carrier.carrier.writer,
         "authority_transfer_mismatch",
     ) {
-        return Some(violation);
+        return Ok(Some(violation));
     }
 
     if let Some(reverse) = &edge.reverse_evidence {
@@ -687,8 +708,12 @@ fn validate_migration_edge(
             source_carrier,
             contract.required_context.as_ref(),
             "reverse",
-        ) {
-            return Some(violation);
+            prepared_edge
+                .reverse_verification
+                .as_ref()
+                .ok_or_else(|| ToolError::internal("prepared reverse evidence is missing"))?,
+        )? {
+            return Ok(Some(violation));
         }
         if let Some(violation) = validate_authority_claim(
             edge,
@@ -697,15 +722,15 @@ fn validate_migration_edge(
             &source_carrier.carrier.writer,
             "reverse_authority_transfer_mismatch",
         ) {
-            return Some(violation);
+            return Ok(Some(violation));
         }
     }
 
-    validate_cleanup_claim(
+    Ok(validate_cleanup_claim(
         edge,
         source.node.cleanup.as_ref(),
         target.node.cleanup.as_ref(),
-    )
+    ))
 }
 
 fn validate_bound_evidence(
@@ -715,101 +740,61 @@ fn validate_bound_evidence(
     expected_target: &PreparedMigrationCarrier<'_>,
     required_context: Option<&ContextMonitor>,
     orientation: &str,
-) -> Option<MigrationViolation> {
+    verification: &cert::CertificateResult,
+) -> Result<Option<MigrationViolation>, ToolError> {
     let CertificateClaim::CompareEquivalenceRelation { subject, .. } = &certificate.claim else {
-        return Some(edge_violation(
+        return Ok(Some(edge_violation(
             edge,
             Some(&edge.affected_carrier),
             "unsupported_evidence_kind",
             [("orientation", json!(orientation))],
-        ));
+        )));
     };
 
-    let left = match cert::canonical_machine_encoding(&subject.left) {
-        Ok(encoding) => encoding,
-        Err(error) => return Some(evidence_input_violation(edge, orientation, &error)),
-    };
+    let left = cert::canonical_machine_encoding(&subject.left)?;
     if left != expected_source.machine_encoding {
-        return Some(edge_violation(
+        return Ok(Some(edge_violation(
             edge,
             Some(&edge.affected_carrier),
             "evidence_source_binding_mismatch",
             [("orientation", json!(orientation))],
-        ));
+        )));
     }
-    let right = match cert::canonical_machine_encoding(&subject.right) {
-        Ok(encoding) => encoding,
-        Err(error) => return Some(evidence_input_violation(edge, orientation, &error)),
-    };
+    let right = cert::canonical_machine_encoding(&subject.right)?;
     if right != expected_target.machine_encoding {
-        return Some(edge_violation(
+        return Ok(Some(edge_violation(
             edge,
             Some(&edge.affected_carrier),
             "evidence_target_binding_mismatch",
             [("orientation", json!(orientation))],
-        ));
+        )));
     }
-    let actual_context = match cert::canonical_context_encoding(
-        subject.context.as_ref(),
-        &expected_source.actions,
-    ) {
-        Ok(encoding) => encoding,
-        Err(error) => return Some(evidence_input_violation(edge, orientation, &error)),
-    };
+    let actual_context =
+        cert::canonical_context_encoding(subject.context.as_ref(), &expected_source.actions)?;
     let expected_context =
-        match cert::canonical_context_encoding(required_context, &expected_source.actions) {
-            Ok(encoding) => encoding,
-            Err(error) => {
-                return Some(edge_violation(
-                    edge,
-                    Some(&edge.affected_carrier),
-                    "internal_context_binding_error",
-                    [
-                        ("orientation", json!(orientation)),
-                        ("message", json!(error.message)),
-                    ],
-                ));
-            }
-        };
+        cert::canonical_context_encoding(required_context, &expected_source.actions)?;
     if actual_context != expected_context {
-        return Some(edge_violation(
+        return Ok(Some(edge_violation(
             edge,
             Some(&edge.affected_carrier),
             "evidence_context_binding_mismatch",
             [("orientation", json!(orientation))],
-        ));
+        )));
     }
 
-    match cert::verify(certificate) {
-        Err(error) => Some(evidence_input_violation(edge, orientation, &error)),
-        Ok(result) if !result.accepted => Some(edge_violation(
+    if !verification.accepted {
+        return Ok(Some(edge_violation(
             edge,
             Some(&edge.affected_carrier),
             "evidence_rejected",
             [
                 ("orientation", json!(orientation)),
-                ("rejection", json!(result.rejection)),
+                ("rejection", json!(verification.rejection)),
             ],
-        )),
-        Ok(_) => None,
+        )));
     }
-}
 
-fn evidence_input_violation(
-    edge: &MigrationEdge,
-    orientation: &str,
-    error: &ToolError,
-) -> MigrationViolation {
-    edge_violation(
-        edge,
-        Some(&edge.affected_carrier),
-        "evidence_invalid_input",
-        [
-            ("orientation", json!(orientation)),
-            ("error_code", json!(error.code)),
-            ("message", json!(&error.message)),
-        ],
-    )
+    Ok(None)
 }
 
 fn validate_authority_claim(
@@ -1681,6 +1666,75 @@ mod tests {
             relation[0].left = "unknown".to_owned();
         }
         assert_eq!(violation_code(&rejected), Some("evidence_rejected"));
+    }
+
+    #[test]
+    fn migration_rejects_malformed_embedded_certificates_as_invalid_input() {
+        let mut wrong_schema = migration_graph();
+        wrong_schema.edges[0].evidence.schema_version = "wrong".to_owned();
+        assert_eq!(
+            validate_migration(&wrong_schema)
+                .expect_err("nested certificate schema must remain a typed input error")
+                .code,
+            "invalid_input"
+        );
+
+        let mut invalid_subject = migration_graph();
+        if let CertificateClaim::CompareEquivalenceRelation { subject, .. } =
+            &mut invalid_subject.edges[0].evidence.claim
+        {
+            subject.left.initial = "unknown".to_owned();
+        }
+        assert_eq!(
+            validate_migration(&invalid_subject)
+                .expect_err("invalid nested subject must remain a typed input error")
+                .code,
+            "invalid_input"
+        );
+
+        let mut masked_by_same_edge = migration_graph();
+        masked_by_same_edge.nodes[1].carriers[0].machine =
+            masked_by_same_edge.nodes[0].carriers[0].machine.clone();
+        masked_by_same_edge.edges[0].evidence.schema_version = "wrong".to_owned();
+        assert_eq!(
+            validate_migration(&masked_by_same_edge)
+                .expect_err("same-edge semantic failure must not mask malformed evidence")
+                .code,
+            "invalid_input"
+        );
+
+        let mut masked_by_earlier_edge = migration_graph();
+        if let CertificateClaim::CompareEquivalenceRelation { relation, .. } =
+            &mut masked_by_earlier_edge.edges[0].evidence.claim
+        {
+            relation.clear();
+        }
+        masked_by_earlier_edge.edges[1].evidence.schema_version = "wrong".to_owned();
+        assert_eq!(
+            validate_migration(&masked_by_earlier_edge)
+                .expect_err("earlier semantic failure must not mask later malformed evidence")
+                .code,
+            "invalid_input"
+        );
+
+        let mut masked_reverse = migration_graph();
+        if let CertificateClaim::CompareEquivalenceRelation { relation, .. } =
+            &mut masked_reverse.edges[0].evidence.claim
+        {
+            relation.clear();
+        }
+        masked_reverse.edges[0]
+            .reverse_evidence
+            .as_mut()
+            .expect("reverse evidence")
+            .certificate
+            .schema_version = "wrong".to_owned();
+        assert_eq!(
+            validate_migration(&masked_reverse)
+                .expect_err("forward rejection must not mask malformed reverse evidence")
+                .code,
+            "invalid_input"
+        );
     }
 
     #[test]

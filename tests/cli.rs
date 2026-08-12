@@ -484,6 +484,20 @@ fn migration_cli_rejects_structural_ambiguity() {
 }
 
 #[test]
+fn migration_cli_preserves_nested_certificate_input_errors() {
+    let mut input = migration_example();
+    input["nodes"][1]["carriers"][0]["machine"] =
+        input["nodes"][0]["carriers"][0]["machine"].clone();
+    input["edges"][0]["evidence"]["schema_version"] = serde_json::json!("wrong");
+    let output = run_value("validate-migration", &input);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).expect("stderr must be JSON");
+    assert_eq!(error["operation"], "validate-migration");
+    assert_eq!(error["error"]["code"], "invalid_input");
+}
+
+#[test]
 fn certificate_examples_cover_relation_witness_and_trace() {
     let cases = [
         (

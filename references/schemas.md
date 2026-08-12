@@ -674,19 +674,21 @@ rank.
 Every edge references known endpoints, has a non-empty operation label, and
 names exactly one carrier whose canonical machine encoding differs between the
 endpoints. No other carrier machine may change on that edge. Writer authority
-may change only for the affected carrier. `authority_transfer` is absent when
-its endpoint writers are equal and otherwise must equal their exact ordered
-pair. A writer-only handoff or exact no-op has an empty machine-change set and
-is therefore rejected in v1; it is not laundered through an identity
-certificate.
+may change only for the affected carrier; neither a machine nor a writer may
+change outside it. `authority_transfer` is absent when its endpoint writers are
+equal and otherwise must equal their exact ordered pair. A writer-only handoff
+or exact no-op has an empty machine-change set and is therefore rejected in v1;
+it is not laundered through an identity certificate.
 
 `evidence` must have claim kind `compare_equivalence_relation`. Its subject's
 left machine must canonically equal the source carrier, its right machine must
 canonically equal the target carrier, and its context must canonically equal
 the carrier contract's required context. The validator reruns the local
 certificate checker and requires `accepted: true`; it never trusts a stored
-verdict. Invalid certificate structure becomes a completed graph violation,
-while an invalid graph or endpoint model is a typed input error.
+verdict. A malformed nested certificate schema, subject machine, or context is
+a typed input error, just as it is for standalone `verify-certificate`. A
+structurally valid but false, stale, or nonaccepting certificate is a completed
+graph violation.
 
 Optional `reverse_evidence` has this shape:
 
@@ -699,8 +701,10 @@ Optional `reverse_evidence` has this shape:
 ```
 
 The certificate is bound and checked from target to source; the transfer is the
-exact reverse endpoint-writer delta. This validates only the supplied reverse
-proof bundle. It is not an executable rollback and does not add a graph edge.
+exact reverse endpoint-writer delta. `operation` is required non-empty metadata
+but is not checked against executable behavior. This validates only the
+supplied reverse proof bundle. It is not an executable rollback and does not
+add a graph edge.
 
 `cleanup_transition` must exactly reflect the endpoint node states:
 
@@ -867,5 +871,5 @@ accepted because v0.1 has no mechanically checked lower-bound proof language.
 The executable does not ship automatic source extraction, causal inference,
 probabilistic state reconstruction, hypergraph clustering, architecture search,
 routing optimization, queue simulation, cache/NUMA prediction, physical energy,
-Rent fitting, passivity checking, or migration validation. These require
+Rent fitting, passivity checking, or migration-path optimization. These require
 separate evidence and certificate checkers rather than unverified flags.

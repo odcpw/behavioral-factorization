@@ -1,6 +1,6 @@
 ---
 name: behavioral-factorization
-description: Validate or falsify explicit finite behavioral models and finite candidate or route records with kerf. Use when a task supplies a deterministic LTS/context monitor, asks for kerf, needs an exact quotient or shortest distinguishing trace, or compares a finite supplied candidate set or static routes. Use optimize-program-seam-topology for repository discovery, migration planning, or architecture work involving folding or biology metaphors; return here only after it yields an explicit finite model.
+description: Validate or falsify explicit finite models and records with kerf. Use for deterministic LTS/context behavior, exact quotients or shortest witnesses, finite candidates or routes, and proof-carrying migration graphs. Use optimize-program-seam-topology for repository discovery or architecture work involving folding or biology metaphors; return here after it yields an explicit finite model.
 ---
 
 # Behavioral Factorization
@@ -38,11 +38,13 @@ Do not run the whole method by default.
 - **Finite behavior check:** use workflow steps 1–4 and 8. Read
   [schemas.md](references/schemas.md) and the quotient section of
   [causal-boundaries.md](references/causal-boundaries.md).
-- **Finite candidate or route check:** read [schemas.md](references/schemas.md)
+- **Finite candidate, route, or migration-graph check:** read
+  [schemas.md](references/schemas.md)
   plus the applicable section of
   [search-and-migration.md](references/search-and-migration.md) or
   [evidence-and-flow.md](references/evidence-and-flow.md). For candidates use
-  steps 1, 2, 5, 6, and 8; for routes use steps 1, 2, 5, 7, and 8.
+  steps 1, 2, 5, 6, and 8; for routes use steps 1, 2, 5, 7, and 8; for
+  migration graphs use steps 1, 2, 7, and 8.
 - **Standalone natural analogy test after repository evidence extraction:** use
   steps 1, 2, and 8. Read
   [natural-systems.md](references/natural-systems.md) and translate the analogy
@@ -253,8 +255,10 @@ certificate per edge, exact writer transfer, and a node-owned cleanup rank.
 While cleanup is open, every edge must preserve its obligation and strictly
 decrease its positive rank or discharge it. Requiring every positive node to
 have an outgoing edge then proves that every maximal continuation discharges
-within its starting rank. Reverse evidence is only a checked reverse proof bundle; it is
-not an executable rollback or graph edge. See [schemas.md](references/schemas.md).
+within its starting rank. Reverse evidence is only a checked reverse proof
+bundle; its operation is a non-empty metadata label, not execution evidence,
+and the bundle is neither an executable rollback nor a graph edge. See
+[schemas.md](references/schemas.md).
 
 For declared unsplittable routes:
 

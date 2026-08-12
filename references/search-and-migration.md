@@ -176,8 +176,10 @@ legal because it starts a new bounded cleanup episode.
 
 An optional reverse evidence bundle is checked against the endpoints in reverse
 and against the reversed writer transfer. It is not an executable rollback and
-is not graph adjacency. Actual rollback availability requires an explicit
-reverse edge, which must independently satisfy every graph and cleanup law.
+is not graph adjacency. An explicit reverse edge supplies finite graph
+adjacency and must independently satisfy every graph and cleanup law, but even
+that does not prove an operation is executable or runtime rollback is
+available.
 
 This theorem is exact for the supplied finite machines, contexts, certificates,
 writer labels, and ranks. It does not establish source-code equivalence,
@@ -188,7 +190,7 @@ After graph validity, a future path optimizer may retain edge costs as a vector:
 
 ```text
 semantic carriers touched
-temporary duplicate authority
+single-authority compatibility-adapter lifetime
 API/ABI churn
 proof and test reruns
 runtime risk
