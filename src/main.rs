@@ -1,5 +1,5 @@
 use kerf::TOOL_VERSION;
-use kerf::candidates::{self, CandidateInput};
+use kerf::candidates::{self, CandidateInput, MigrationGraphInput};
 use kerf::cert::{self, CertificateInput};
 use kerf::factor::{self, FactorInput, FactorLimits};
 use kerf::factor_search::{self, FactorSearchInput, FactorSearchLimits};
@@ -114,7 +114,7 @@ fn run() -> Result<(), ExecutionError> {
             dispatch(command, Path::new(path))
         }
         _ => Err(bare_error(ToolError::invalid(
-            "usage: kerf <validate-lts|quotient|distinguish|factor|search-factors|recompose|check-morphism|verify-certificate|validate-candidates|pareto|score-routes> <input.json>",
+            "usage: kerf <validate-lts|quotient|distinguish|factor|search-factors|recompose|check-morphism|verify-certificate|validate-candidates|validate-migration|pareto|score-routes> <input.json>",
         ))),
     }
 }
@@ -131,6 +131,7 @@ fn is_command(command: &str) -> bool {
             | "check-morphism"
             | "verify-certificate"
             | "validate-candidates"
+            | "validate-migration"
             | "pareto"
             | "score-routes"
     )
@@ -219,6 +220,7 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
             emit(command, input_sha256.clone(), None, result)
                 .map_err(|error| contextual(error, command, &input_sha256, None))
         }
+        "validate-migration" => dispatch_migration(&bytes, command, &input_sha256),
         "pareto" => {
             let input: CandidateInput =
                 parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
@@ -227,14 +229,7 @@ fn dispatch(command: &str, path: &Path) -> Result<(), ExecutionError> {
             emit(command, input_sha256.clone(), None, result)
                 .map_err(|error| contextual(error, command, &input_sha256, None))
         }
-        "score-routes" => {
-            let input: TransportInput =
-                parse(&bytes).map_err(|error| contextual(error, command, &input_sha256, None))?;
-            let result = transport::score(&input)
-                .map_err(|error| contextual(error, command, &input_sha256, None))?;
-            emit(command, input_sha256.clone(), None, result)
-                .map_err(|error| contextual(error, command, &input_sha256, None))
-        }
+        "score-routes" => dispatch_transport(&bytes, command, &input_sha256),
         _ => unreachable!("command validated before input is read"),
     }
 }
@@ -251,6 +246,32 @@ fn dispatch_morphism(
         .map_err(|error| contextual(error, command, input_sha256, limits))?;
     emit(command, input_sha256.to_owned(), limits, result)
         .map_err(|error| contextual(error, command, input_sha256, limits))
+}
+
+fn dispatch_migration(
+    bytes: &[u8],
+    command: &str,
+    input_sha256: &str,
+) -> Result<(), ExecutionError> {
+    let input: MigrationGraphInput =
+        parse(bytes).map_err(|error| contextual(error, command, input_sha256, None))?;
+    let result = candidates::validate_migration(&input)
+        .map_err(|error| contextual(error, command, input_sha256, None))?;
+    emit(command, input_sha256.to_owned(), None, result)
+        .map_err(|error| contextual(error, command, input_sha256, None))
+}
+
+fn dispatch_transport(
+    bytes: &[u8],
+    command: &str,
+    input_sha256: &str,
+) -> Result<(), ExecutionError> {
+    let input: TransportInput =
+        parse(bytes).map_err(|error| contextual(error, command, input_sha256, None))?;
+    let result =
+        transport::score(&input).map_err(|error| contextual(error, command, input_sha256, None))?;
+    emit(command, input_sha256.to_owned(), None, result)
+        .map_err(|error| contextual(error, command, input_sha256, None))
 }
 
 fn bare_error(error: ToolError) -> ExecutionError {
@@ -327,6 +348,7 @@ COMMANDS:\n\
   check-morphism        Check a supplied exact finite machine morphism\n\
   verify-certificate    Locally verify a finite relation, witness, or trace\n\
   validate-candidates   Check explicit assignment and authority constraints\n\
+  validate-migration    Check a proof-carrying finite migration graph\n\
   pareto                Compute the exact frontier of the supplied candidate set\n\
   score-routes          Account exact load on supplied static routes\n\n\
 All analysis results are versioned JSON on stdout. Errors are typed JSON on stderr."

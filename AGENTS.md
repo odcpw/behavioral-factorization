@@ -49,7 +49,8 @@ This file adds only repository-specific rules to
 - `src/cert.rs` locally checks hash-bound finite relations, inequivalence
   witnesses, and recorded traces; provenance remains orthogonal to validity.
 - `src/candidates.rs` owns explicit architecture assignments, executable hard
-  constraints, exact metric validation, and Pareto dominance.
+  constraints, exact metric validation, Pareto dominance, and finite
+  proof-carrying migration-graph validation.
 - `src/transport.rs` owns arbitrary-precision exact rational arithmetic for
   declared static routes.
 - `src/report.rs` owns typed domain errors and input hashing.

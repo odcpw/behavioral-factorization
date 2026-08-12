@@ -103,6 +103,43 @@ fn morphism_example() -> Value {
     })
 }
 
+fn migration_example() -> Value {
+    let certificate: Value = serde_json::from_slice(
+        &std::fs::read(repo_path("examples/simple-equivalence.cert.json"))
+            .expect("certificate example must read"),
+    )
+    .expect("certificate example must be JSON");
+    let left = certificate["claim"]["subject"]["left"].clone();
+    let right = certificate["claim"]["subject"]["right"].clone();
+    serde_json::json!({
+        "schema_version": "kerf.migration-graph.v1",
+        "carrier_contracts": [{"id": "world", "required_context": null}],
+        "nodes": [
+            {
+                "id": "legacy",
+                "carriers": [{"id": "world", "machine": left, "writer": "owner"}],
+                "cleanup": null
+            },
+            {
+                "id": "factored",
+                "carriers": [{"id": "world", "machine": right, "writer": "owner"}],
+                "cleanup": null
+            }
+        ],
+        "edges": [{
+            "id": "migrate-world",
+            "source": "legacy",
+            "target": "factored",
+            "operation": "replace-world-representation",
+            "affected_carrier": "world",
+            "evidence": certificate,
+            "authority_transfer": null,
+            "cleanup_transition": {"kind": "neutral"},
+            "reverse_evidence": null
+        }]
+    })
+}
+
 #[test]
 fn quotient_example_is_input_bound_json() {
     let output = run("quotient", "examples/toggle.lts.json");
@@ -403,6 +440,47 @@ fn route_example_reports_exact_weighted_hop_traffic() {
         serde_json::json!({"num": "128000", "den": "1"})
     );
     assert!(output["limits"].is_null());
+}
+
+#[test]
+fn migration_cli_accepts_a_bound_certificate_and_reports_false_claims() {
+    let input = migration_example();
+    let accepted = run_value("validate-migration", &input);
+    assert!(accepted.status.success());
+    assert!(accepted.stderr.is_empty());
+    let accepted: Value = serde_json::from_slice(&accepted.stdout).expect("stdout must be JSON");
+    assert_eq!(accepted["operation"], "validate-migration");
+    assert_eq!(accepted["result"]["valid"], true);
+    assert_eq!(accepted["result"]["edges_checked"], 1);
+    assert!(accepted["limits"].is_null());
+
+    let mut rejected = input;
+    rejected["edges"][0]["evidence"]["claim"]["relation"] = serde_json::json!([]);
+    let rejected = run_value("validate-migration", &rejected);
+    assert!(rejected.status.success());
+    assert!(rejected.stderr.is_empty());
+    let rejected: Value = serde_json::from_slice(&rejected.stdout).expect("stdout must be JSON");
+    assert_eq!(rejected["result"]["valid"], false);
+    assert_eq!(
+        rejected["result"]["first_violation"]["code"],
+        "evidence_rejected"
+    );
+}
+
+#[test]
+fn migration_cli_rejects_structural_ambiguity() {
+    let mut input = migration_example();
+    let duplicate = input["nodes"][0]["carriers"][0].clone();
+    input["nodes"][0]["carriers"]
+        .as_array_mut()
+        .expect("carriers must be an array")
+        .push(duplicate);
+    let output = run_value("validate-migration", &input);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).expect("stderr must be JSON");
+    assert_eq!(error["operation"], "validate-migration");
+    assert_eq!(error["error"]["code"], "invalid_input");
 }
 
 #[test]

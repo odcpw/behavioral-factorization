@@ -241,6 +241,21 @@ After the semantic quotient, choose authority, schedule, placement, routing,
 buffering, and materialization together. A good module graph can still cause
 bad cache, NUMA, serialization, or queue behavior.
 
+For a supplied finite migration graph whose nodes already contain complete
+carrier models and whose edges already contain local certificates:
+
+```bash
+kerf validate-migration proposed.migration.json
+```
+
+The validator rechecks exactly one directionally bound carrier-equivalence
+certificate per edge, exact writer transfer, and a node-owned cleanup rank.
+While cleanup is open, every edge must preserve its obligation and strictly
+decrease its positive rank or discharge it. Requiring every positive node to
+have an outgoing edge then proves that every maximal continuation discharges
+within its starting rank. Reverse evidence is only a checked reverse proof bundle; it is
+not an executable rollback or graph edge. See [schemas.md](references/schemas.md).
+
 For declared unsplittable routes:
 
 ```bash

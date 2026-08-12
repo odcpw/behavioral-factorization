@@ -21,6 +21,7 @@ models. LTS exploration has explicit state, pair, and witness-depth limits:
 - check a supplied total state function as an all-state or context-reachable
   finite machine morphism, with separately named carrier and section claims;
 - validate explicit assignment, separation, pin, and authority constraints;
+- validate proof-carrying one-carrier migration edges and well-founded cleanup;
 - compute the exact Pareto frontier of the represented-feasible supplied set; and
 - account checked rational load on declared static routes.
 

@@ -145,10 +145,46 @@ minimum cardinality: a different hitting set may use fewer members. Claim the
 smallest nucleus only after exhaustive search on a bounded instance or a checked
 solver certificate that no smaller hitting set exists.
 
-## Migration graph
+## Proof-carrying migration graph
 
-Let each node be a complete revision and each directed edge an allowed change
-with revision-bound validation. Edge costs remain a vector:
+`kerf validate-migration` checks an explicit finite graph, not a repository.
+Each node is a complete modeled state over one fixed carrier universe. For each
+carrier it contains one finite machine and one writer; the node may also carry
+one cleanup obligation with a positive natural rank. Each directed edge changes
+exactly one machine, embeds a locally checkable source-to-target equivalence
+certificate under the carrier's graph-fixed context, and exactly states any
+writer transfer. Canonical machine encodings establish endpoint identity;
+asserted hashes and JSON declaration order do not.
+
+Cleanup is node state because an edge-only annotation is ambiguous at joins.
+The admitted transitions are:
+
+```text
+debt-free -> debt-free       neutral
+debt-free -> (o, r)          introduce, r > 0
+(o, r)    -> (o, r')         progress, 0 < r' < r
+(o, r)    -> debt-free       discharge
+```
+
+Every positive node must have an outgoing edge. Consequently, any maximal
+continuation that starts at rank `r` reaches debt-free state within at most `r`
+edges: continuing positive edges form a strictly descending sequence of
+positive natural numbers. Equivalently, no path can remain positive for `r`
+edges. Obligation swaps, plateaus, ascents, positive sinks, and wholly positive
+cycles are rejected locally. A debt-free-to-positive-to-debt-free cycle remains
+legal because it starts a new bounded cleanup episode.
+
+An optional reverse evidence bundle is checked against the endpoints in reverse
+and against the reversed writer transfer. It is not an executable rollback and
+is not graph adjacency. Actual rollback availability requires an explicit
+reverse edge, which must independently satisfy every graph and cleanup law.
+
+This theorem is exact for the supplied finite machines, contexts, certificates,
+writer labels, and ranks. It does not establish source-code equivalence,
+operation executability, Git identity, runtime authority enforcement,
+cross-carrier composition, carrier creation/removal, or path existence.
+
+After graph validity, a future path optimizer may retain edge costs as a vector:
 
 ```text
 semantic carriers touched
@@ -160,8 +196,9 @@ build disruption
 developer time
 ```
 
-Find a feasible multiobjective path, not merely the best endpoint. Each edge
-should make one independently verifiable ownership or protocol change.
+Find a feasible multiobjective path, not merely the best endpoint. This search
+is outside `validate-migration`; the current command adds no hidden weights and
+does not infer paths.
 
 Temporary adapters require:
 

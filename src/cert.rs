@@ -883,6 +883,30 @@ fn hash_pair_subject(
     Ok(sha256_hex(&bytes))
 }
 
+pub(crate) fn canonical_machine_encoding(machine: &Machine) -> Result<Vec<u8>, ToolError> {
+    let indexed = lts::index_machine(machine)?;
+    let mut bytes = b"kerf.cert.machine.v1\0".to_vec();
+    encode_actions(&mut bytes, &indexed.actions)?;
+    encode_machine(&mut bytes, &indexed)?;
+    Ok(bytes)
+}
+
+#[cfg(test)]
+pub(crate) fn compare_subject_sha256(subject: &CompareSubject) -> Result<String, ToolError> {
+    Ok(prepare_pair(subject)?.subject_sha256)
+}
+
+pub(crate) fn canonical_context_encoding(
+    context: Option<&ContextMonitor>,
+    actions: &[String],
+) -> Result<Vec<u8>, ToolError> {
+    let indexed = lts::index_context(context, actions)?;
+    let mut bytes = b"kerf.cert.context.v1\0".to_vec();
+    encode_actions(&mut bytes, actions)?;
+    encode_context(&mut bytes, &indexed, context.is_some())?;
+    Ok(bytes)
+}
+
 fn hash_trace_subject(
     machine: &IndexedMachine,
     context: &IndexedContext,
