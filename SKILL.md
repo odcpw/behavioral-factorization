@@ -140,8 +140,10 @@ bound when the context monitor is external side information.
 
 For the repository's fixed executable regression falsifier, run
 `kerf-selfhost` with an explicit `--kerf`, `--repo-root`, `--expect-head`, and
-`--corpus`. A clean-tree pass binds raw exit/stdout/stderr observations to one
-Git HEAD and executable hash. It does not prove source-to-binary derivation or
+`--corpus`. `--repo-root` may be a tracked subproject of a larger Git worktree;
+the result binds its relative subpath as well as the containing HEAD. A
+clean-tree pass binds raw exit/stdout/stderr observations to that subpath, one
+Git HEAD, and one executable hash. It does not prove source-to-binary derivation or
 generalize beyond the corpus; see [schemas.md](references/schemas.md).
 
 When another tool supplies a finite relation, distinguishing word, or recorded
@@ -162,6 +164,22 @@ contexts. Ask:
 - Is the boundary state Markov-sufficient at the declared horizon?
 - Does the objective itself factor, or do shared allocators, locks, caches,
   quotas, or build roots create cross-terms?
+
+For artifact mutations, begin with the causal transaction alphabet rather than
+files or call names:
+
+```text
+borrowed input -> caller-owned stage -> accepted | rejected | explicit bypass
+accepted | explicit bypass -> readback -> publish
+```
+
+Keep pre-existing destination state and publication identity observable.
+“Validator executed” and “candidate accepted” are different emissions; a
+discarded report cannot justify `publish`. A family-independent boundary may
+factor DOCX/PPTX/XLSX/VBA-like contexts through one transaction state while
+retaining family as external context, but that finite result still needs
+executed source correspondence. Falsify with rejection cleanup, a sentinel at
+the destination, explicit bypass, and post-commit readback.
 
 Mori-Zwanzig supplies the warning: eliminating relevant state generally
 reappears as memory and unresolved forcing. A small stateless API with large
