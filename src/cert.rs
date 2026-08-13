@@ -9,7 +9,7 @@ pub const CERTIFICATE_CHECK_SCHEMA: &str = "kerf.certificate-check.v1";
 pub const COMPARE_SUBJECT_SCHEMA: &str = "kerf.cert.compare-subject.v1";
 pub const LTS_SUBJECT_SCHEMA: &str = "kerf.cert.lts-subject.v1";
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CertificateInput {
     pub schema_version: String,
@@ -18,7 +18,7 @@ pub struct CertificateInput {
     pub expected_provenance: Option<Provenance>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CertificateClaim {
     CompareEquivalenceRelation {
@@ -46,7 +46,7 @@ pub enum CertificateClaim {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompareSubject {
     pub schema_version: String,
@@ -56,7 +56,7 @@ pub struct CompareSubject {
     pub context: Option<ContextMonitor>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LtsSubject {
     pub schema_version: String,
@@ -250,6 +250,15 @@ pub fn verify(input: &CertificateInput) -> Result<CertificateResult, ToolError> 
             ))
         }
     }
+}
+
+/// Compute the canonical semantic identity used by LTS trace certificates.
+///
+/// # Errors
+///
+/// Returns [`ToolError`] when the finite machine or context is invalid.
+pub fn trace_subject_sha256(subject: &LtsSubject) -> Result<String, ToolError> {
+    Ok(prepare_trace(subject)?.subject_sha256)
 }
 
 fn result(

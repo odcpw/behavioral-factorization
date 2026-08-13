@@ -21,6 +21,10 @@ review`, `Perspective`, `evidence audit`, or `documentation`.
   <https://doi.org/10.1017/S0305004100074338>
 - Willems, *The Behavioral Approach to Open and Interconnected Systems*:
   <https://doi.org/10.1109/MCS.2007.906923>
+- Baez, *Double Categories of Open Systems: A Cospan Approach*:
+  <https://arxiv.org/abs/2509.22584>
+- Libkind et al., *Compositional System Dynamics*:
+  <https://arxiv.org/abs/2509.18475>
 
 ## Semantics, minimality, and program reasoning
 
@@ -50,6 +54,31 @@ review`, `Perspective`, `evidence audit`, or `documentation`.
 - Reynolds, *Separation Logic*: <https://www.cs.cmu.edu/~jcr/seplogic.pdf>
 - Calcagno, O'Hearn, and Yang, *Local Action and Abstract Separation Logic*:
   <https://doi.org/10.1109/LICS.2007.30>
+- `recent system` — *Compositional Program Verification with Polynomial
+  Functors*: <https://arxiv.org/abs/2604.01303>
+- *HEC: Equivalence Checking via Equality Saturation*:
+  <https://arxiv.org/abs/2506.02290>
+- *E-Graphs With Bindings*: <https://arxiv.org/abs/2505.00807>
+- Angluin, *Learning Regular Sets from Queries and Counterexamples*:
+  <https://doi.org/10.1016/0890-5401(87)90052-6>
+- Isberner, Howar, and Steffen, *The TTT Algorithm*:
+  <https://doi.org/10.1007/978-3-319-11164-3_26>
+- Vaandrager, `survey` — *Model Learning*:
+  <https://doi.org/10.1145/2967606>
+- Chow, *Testing Software Design Modeled by Finite-State Machines*:
+  <https://doi.org/10.1109/TSE.1978.231496>
+
+## Architecture recovery and semantic traceability
+
+- *Architecture Entity Recognition in Software Repositories*:
+  <https://arxiv.org/abs/2511.02434>
+- `landscape study` — *The ARDoCo Approach and Architecture Documentation
+  Consistency Landscape*: <https://arxiv.org/abs/2606.28064>
+- *Natural-Language/Programming-Language Traceability Needs More Than
+  Similarity*: <https://arxiv.org/abs/2509.05585>
+
+These recent systems motivate candidate extraction and traceability, not an
+assumption that names or embeddings establish semantic correspondence.
 
 ## Communication, order, and impossibility
 
@@ -125,6 +154,18 @@ review`, `Perspective`, `evidence audit`, or `documentation`.
   <https://doi.org/10.1016/0005-1098(78)90005-5>
 - Blum, *A Machine-Independent Theory of the Complexity of Recursive Functions*:
   <https://doi.org/10.1145/321386.321395>
+
+## Language and neural representation
+
+- `experiment` — *A Linguistic Bottleneck in Human Communication*:
+  <https://www.nature.com/articles/s41562-025-02336-w>
+- `experiment` — *Compositional and Conjunctive Neural Representations*:
+  <https://www.nature.com/articles/s41467-025-65041-2>
+- `experiment` — *Conversation Operates Across Multiple Timescales*:
+  <https://www.nature.com/articles/s41562-025-02231-4>
+
+These works motivate multiscale and compositional hypotheses. They do not
+establish software boundaries or validate an LLM-generated model.
 
 ## Rust and typed protocols
 

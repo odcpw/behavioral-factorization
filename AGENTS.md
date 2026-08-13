@@ -58,6 +58,10 @@ This file adds only repository-specific rules to
   envelopes with execution context.
 - `src/self_host.rs`, `src/bin/kerf-selfhost.rs`, and `self-host/` own the
   revision-checked raw-process corpus falsifier. It is not a source analyzer.
+- `/home/oliver/Projects/odcpw/semantic-architecture` is the separate global
+  semantic compiler and reality-contact layer. It depends on this crate as its
+  exact finite kernel; keep the dependency one-way and never broaden a Kerf
+  result into a source-program claim.
 - `examples/` are discriminating microcases; `references/` separates theorem,
   engineering inference, conjecture, and broken metaphor.
 

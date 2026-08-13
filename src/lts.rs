@@ -29,7 +29,7 @@ pub struct CompareInput {
     pub limits: Limits,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Machine {
     pub initial: String,
@@ -37,7 +37,7 @@ pub struct Machine {
     pub states: Vec<State>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct State {
     pub id: String,
@@ -46,7 +46,7 @@ pub struct State {
     pub transitions: BTreeMap<String, Transition>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Transition {
     pub to: String,

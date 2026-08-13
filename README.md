@@ -28,7 +28,8 @@ models. LTS exploration has explicit state, pair, and witness-depth limits:
 It does not infer semantics from Rust source or claim a globally optimal real
 architecture. The surrounding skill explains how to build evidence, derive
 applicable lower bounds, and keep the theorem/inference/metaphor boundary
-honest.
+honest. The sibling `semantic-architecture` project is the global model and
+reality-contact layer that lowers explicit finite questions into this kernel.
 
 The name is literal. The irreducible operation found by the research swarm was
 not energy minimization or graph clustering, but factorization of an open
